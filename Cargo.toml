@@ -1,0 +1,20 @@
+[package]
+name = "symtropy-consciousness-physics"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "By-product mutualism in energy-constrained multi-agent systems. 55 findings, 65 experiments."
+repository = "https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physics"
+
+[dependencies]
+symtropy-math = { path = "crates/symtropy-math" }
+symtropy-physics = { path = "crates/symtropy-physics" }
+symthaea-consciousness-equation = { path = "crates/symthaea-consciousness-equation" }
+nalgebra = "0.34"
+
+[features]
+default = []
+consciousness-curvature = []
+
+[dev-dependencies]
+proptest = "1.4"
