@@ -1,32 +1,31 @@
-# Rust toolchain qualification v0.3: stable 1.99.1, 1.100 release gate, 1.101 beta canary
+# Rust toolchain qualification v0.4: stable 1.99.1 baseline, 1.100.0 release candidate, 1.101 beta canary
 
-**Status:** Rust 1.99.1 is the verified baseline. Rust 1.100.0 stable is a release gate, not yet a production pin. Rust 1.101.0-beta.1 is a separate, non-blocking forward-compatibility canary.
+**Status:** Rust/Cargo 1.99.1 is the previously verified project baseline. Rust 1.100.0 is now officially published (2026-11-12) and is undergoing exact-head qualification. The project default remains unchanged until the candidate clears all gates. Rust 1.101.0-beta.1 is a separate, non-blocking forward-compatibility canary.
 
-## Verified release status
+## Release-day chronology and evidence
 
-At the observation point recorded in PR #2:
+1. Earlier on 2026-11-12, GitHub Actions verified Rust/Cargo 1.99.1 as the published stable channel. At that observation, an exact `rustup toolchain install 1.100.0` attempt returned HTTP 404 and beta resolved to 1.101.0-beta.1. We correctly skipped candidate checks then.
+2. Later on 2026-11-12, the official Rust release notes published **Version 1.100.0 (2026-11-12)**. The Rust Forge schedule also placed 1.100.0's stable date on November 12.
+3. The release gate in this PR discovers the actual stable channel. On this updated head it should now identify 1.100.0 and execute the exact candidate checks; the run result is the authority for install/build availability. Do not transfer the earlier 1.99.1 or beta smoke results to 1.100.0.
 
-- The official Rust release-announcement index lists Rust 1.99.1 (October 15, 2026) as its latest published release.
-- The Rust 1.100.0 release notes are present in development documentation, and the associated GitHub issue is a draft release-notes tracker.
-- GitHub Actions tried to install `1.100.0-x86_64-unknown-linux-gnu` from `static.rust-lang.org` and received HTTP 404.
-- Rustup's mutable beta alias resolved to 1.101.0-beta.1. We did not substitute it for 1.100.0.
+The 1.100.0 release notes are available at https://dev-doc.rust-lang.org/releases.html. The release announcement index at https://blog.rust-lang.org/releases/ may lag the compiler release notes on release day; do not use its stale list alone to infer that the distribution is unavailable.
 
-Therefore, the default project toolchain remains pinned at Rust/Cargo 1.99.1. The exact stable workflow discovers the published stable channel and only runs the 1.100.0 suite when both rustc and Cargo identify as 1.100.0. It records a clear NOT YET AVAILABLE disposition otherwise.
+## 1.100 capabilities to qualify
 
-The separate 1.101.0-beta.1 lane is explicitly non-blocking and is never treated as evidence that 1.100.0 stable is available.
+The 1.100 release notes introduce:
+1. Cargo's own lint framework and the `cargo::unused_dependencies` lint configured through `[lints.cargo]`.
+2. Minimum publish-age dependency cooldown configuration. The resolver ignores versions newer than the configured minimum publish age unless the version is already present in Cargo.lock.
+3. A new intermediate build-artifact directory layout. It is internal, not a stable interface; tooling should consume Cargo's `compiler-artifact` JSON messages.
+4. Stabilization of the never type and related inference changes.
+5. Stabilized `extern "custom"` and other compiler/library updates listed in the official release notes.
 
-## 1.100 Cargo capabilities to qualify when published
+The isolated unused-dependency fixture declares a local path dependency not referenced by the fixture source and requires Cargo to emit the expected warning. This test already passed under Rust/Cargo 1.101.0-beta.1; the exact 1.100.0 run remains separately required.
 
-The 1.100 development release notes document:
+## Cargo publication-age policy
 
-1. Cargo's native lint framework and the `cargo::unused_dependencies` lint, configured through `[lints.cargo]`.
-2. Minimum publication-age configuration / dependency cooldowns. The resolver ignores recently published versions unless they already exist in Cargo.lock.
-3. A new intermediate build-artifact directory layout. The layout is internal and not a supported interface; tools should consume Cargo's `compiler-artifact` JSON messages instead of hard-coding private paths.
-4. Rust language/compiler changes including never-type stabilization and the associated fallback change across editions.
+The opt-in canary configures a 14-day minimum publish age and `resolver.incompatible-publish-age = "deny"`. Existing locked versions remain usable, while newly resolved too-recent versions should be ignored. The current workspace fetch exercises the locked-graph path. A deterministic local sparse-registry negative control with a deliberately too-new `pubtime` is still required before claiming the resolver rejects such a version in our own test corpus.
 
-The unused-dependency fixture deliberately declares a local path dependency that no Rust source uses. The canary requires Cargo to emit its unused-dependency warning without changing the scientific workspace's dependencies.
-
-The publish-age configuration is applied only to the opt-in canary/qualification commands. It does not affect default local builds. The current workspace check exercises existing locked dependencies under the cooldown. A deterministic local-registry too-new-pubtime negative control remains necessary before claiming that a newly published version is rejected in our environment.
+Do not treat a green locked fetch as proof that the negative-control behavior works.
 
 ## Build artifact interface
 
@@ -40,45 +39,66 @@ The manifest captures package identity, target metadata, final artifact filename
 
 ## ABI regression test
 
-Rust 1.99.1 fixed an x86_64 FFI `bool` return-value miscompilation: upper bits of the return register could be unspecified. The original C `_Bool` smoke test normalized the return value and could hide that defect. The new x86_64 assembly observer calls the Rust function and returns the raw EAX value as `uint32_t`, requiring exactly 0 or 1.
+Rust 1.99.1 fixed an x86_64 FFI `bool` return-value miscompilation where upper return-register bits could be unspecified. A conventional C `_Bool` check can normalize and hide the defect. The new x86_64 assembly observer calls the Rust function and exposes raw EAX as `uint32_t`, requiring exactly 0 or 1.
 
-The stable 1.99.1 baseline raw-register probe passed on GitHub Actions. The Rust 1.100 stable probe remains gated on actual distribution availability; the 1.101 beta probe is separate.
+Hosted evidence:
+- Rust 1.99.1 baseline raw-register probe: PASS.
+- Rust 1.101.0-beta.1 isolated raw-register probe: PASS.
+- Rust 1.100.0 exact stable probe: pending the current release-gated run.
 
 ## Qualification gates
 
-- Preserve Rust/Cargo 1.99.1 as the default until an exact stable candidate qualifies.
-- Discover the published stable channel and record exact rustc/Cargo versions.
-- Only run 1.100 tests when stable and Cargo both identify as exactly 1.100.0.
-- Keep Cargo.lock byte-identical.
+- Discover and record exact published stable rustc/Cargo identity.
+- Run Rust 1.100.0 only when both rustc and Cargo identify as 1.100.0.
+- Keep default `rust-toolchain.toml`, Cargo.toml and Cargo.lock unchanged.
 - Require locked metadata, all-target check, tests, Clippy and rustdoc.
-- Require the raw x86_64 ABI probe.
-- Require the Cargo-native unused-dependency fixture to emit the expected warning.
-- Produce the compiler-artifact manifest from Cargo JSON messages.
-- Verify existing locked dependencies remain usable under the publication-age policy.
-- Keep 1.101.0-beta.1 as a non-blocking forward-compatibility lane.
+- Require raw x86_64 ABI probe.
+- Require Cargo-native unused-dependency fixture.
+- Produce artifact manifest through Cargo JSON messages.
+- Verify the locked workspace remains compatible with the 14-day publish-age policy.
+- Keep 1.101.0-beta.1 as a separate non-blocking forward-compatibility canary.
+- Record every skipped or failed stage explicitly; no implicit promotion.
 
-## Performance research
+## Workspace blocker discovered by the forward canary
 
-Measure 1.99.1 vs 1.100.0 on the same source and lockfile after the stable candidate is available:
+Rust/Cargo 1.101.0-beta.1 installed and fetched the locked dependency graph successfully, but all-target compilation exposed a repository source/API mismatch:
 
-- clean-target debug and release build time;
-- cargo check, tests, Clippy and rustdoc duration;
-- peak RSS, target-directory size and binary size;
-- release runtime of deterministic simulation examples;
-- output digests and numerical result deltas;
-- repeated-build reproducibility;
-- FFI/unsafe and cross-target compatibility.
+`examples/hdc_cooperation.rs` imports `symtropy_consciousness_physics::hdc_context`, which is not exported by the crate root. This is tracked separately in issue #3. It is not attributed to the compiler, and the all-target check has not been weakened. The isolated beta ABI/Cargo-lint/artifact smoke job passed independently.
 
-Use rustc-perf as the compiler ecosystem baseline, Cargo `--timings` to distinguish compiler and build-graph bottlenecks, and the Symtropy deterministic simulation examples as the application-specific benchmark. Measure sccache hit/miss behavior separately from cold compiler work.
+## Performance research: compare both the compiler and the application
 
-Five paired runs are exploratory. Do not claim p99 from five repetitions. Tail claims require a much larger observation set or a justified statistical design.
+The exact 1.99.1 versus 1.100.0 benchmark is available only after the release distribution is present:
+
+```sh
+rustup toolchain install 1.99.1 --profile minimal
+rustup toolchain install 1.100.0 --profile minimal
+BUILD_REPEATS=5 RUNTIME_REPEATS=5 \
+  bash scripts/benchmark-rust-1.99.1-vs-1.100.0.sh
+```
+
+The wrapper refuses to run unless rustc and Cargo both identify as exact 1.100.0. It also requires a clean worktree, unchanged lockfile, fresh target dirs, offline measured builds, no sccache wrapper, rotated compiler order and raw outputs.
+
+Compare:
+- upstream rustc-perf fresh/incremental workloads for compiler-wide performance;
+- Cargo `--timings` for build-graph and critical-path diagnosis;
+- compile wall time, CPU time, peak RSS, build dir size and final binary size;
+- deterministic Symtropy release simulation runtime and numerical outcomes;
+- fixed-seed determinism and independent-build reproducibility;
+- cache hit/miss separately from uncached compiler performance.
+
+Five trials are exploratory only. Do not claim p99 from five measurements. No performance gain is assumed from the version number.
+
+## SOTA and promotion standard
+
+We do not claim superiority over rustc-perf using unrelated application examples. Fair comparison uses rustc-perf for compiler-wide behavior, then Symtropy workloads for real application behavior. Qualification requires correctness and reproducibility first; speed is an independent measurement.
+
+Keep the 1.99.1 default until exact stable 1.100.0 checks pass and any candidate-only result differences are explained. Any pin promotion requires a separate reviewed change.
 
 ## References
 
-- Official Rust release announcements: https://blog.rust-lang.org/releases/
-- Rust 1.100 development release notes: https://dev-doc.rust-lang.org/releases.html
-- Rust 1.100 draft release-notes tracker: https://github.com/rust-lang/rust/issues/163811
-- Cargo lints: https://doc.rust-lang.org/nightly/cargo/reference/lints.html
-- Cargo build cache: https://doc.rust-lang.org/nightly/cargo/reference/build-cache.html
-- Minimum publish age RFC: https://rust-lang.github.io/rfcs/3923-cargo-min-publish-age.html
+- Official Rust 1.100 release notes: https://dev-doc.rust-lang.org/releases.html
 - Rust compiler performance testing: https://rustc-dev-guide.rust-lang.org/tests/perf.html
+- rustc-perf profiling: https://rustc-dev-guide.rust-lang.org/profiling/with-rustc-perf.html
+- Cargo lints: https://doc.rust-lang.org/cargo/reference/lints.html
+- Cargo publish-age configuration: https://doc.rust-lang.org/nightly/cargo/reference/config.html
+- Minimum publish age RFC: https://rust-lang.github.io/rfcs/3923-cargo-min-publish-age.html
