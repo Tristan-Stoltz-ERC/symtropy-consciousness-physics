@@ -157,3 +157,31 @@ jobs:
           set -euo pipefail
           git diff --exit-code -- Cargo.lock
           test -z "$(git status --porcelain -- Cargo.lock)"
+
+  rust-1-101-feature-smokes:
+    name: Rust 1.101.0-beta.1 isolated Cargo feature and ABI smoke tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    env:
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact Rust and Cargo beta
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.101.0-beta.1 --profile minimal --component rustfmt
+          RUSTC_VERSION="$(rustup run 1.101.0-beta.1 rustc --version)"
+          CARGO_VERSION="$(rustup run 1.101.0-beta.1 cargo --version)"
+          [[ "$RUSTC_VERSION" == "rustc 1.101.0-beta.1 "* ]]
+          [[ "$CARGO_VERSION" == "cargo 1.101.0-beta.1 "* ]]
+      - name: Verify raw x86_64 C ABI bool return register
+        run: bash scripts/test-rust-ffi-bool.sh 1.101.0-beta.1 1.101.0-beta.1
+      - name: Exercise Cargo-native unused dependency lint in isolated fixture
+        run: bash scripts/test-cargo-1.100-lints.sh 1.101.0-beta.1 1.101.0-beta.1
+      - name: Capture Cargo artifact manifest from isolated fixture
+        run: bash scripts/capture-cargo-artifacts.sh 1.101.0-beta.1 "$RUNNER_TEMP/cargo-artifact-smokes" tests/toolchain/cargo-lints/Cargo.toml
