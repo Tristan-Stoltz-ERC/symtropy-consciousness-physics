@@ -1,21 +1,15 @@
 # Paired Rust toolchain benchmark v0.2
 
-This harness compares exact Rust compiler/Cargo toolchains on the same clean source revision and unchanged Cargo.lock. The default comparison remains Rust 1.96.1 vs 1.99.1. To evaluate the 1.100.0 beta while it is the current beta release, run:
+This harness compares exact Rust compiler/Cargo toolchains on the same clean source revision and unchanged Cargo.lock. The default comparison remains Rust 1.96.1 vs 1.99.1.
+
+To compare the 1.99.1 stable baseline with the 1.100.0 beta candidate, use the exact-version wrapper:
 
 ```sh
-TOOLCHAINS="1.99.1 beta" BUILD_REPEATS=5 RUNTIME_REPEATS=5 \
-  bash benchmarks/rust-toolchain/run-paired.sh
+BUILD_REPEATS=5 RUNTIME_REPEATS=5 \
+  bash scripts/benchmark-rust-1.99.1-vs-1.100.0-beta.sh
 ```
 
-Install both toolchains first. The candidate lane must not silently compare a later beta:
-
-```sh
-rustup toolchain install 1.99.1 --profile minimal
-rustup toolchain install beta --profile minimal
-rustup run beta rustc --version
-```
-
-The canary workflow separately asserts that beta resolves to Rust 1.100.0 and skips explicitly if the beta channel moves on.
+The wrapper refuses to run unless `rustup run beta rustc --version` identifies as exactly 1.100.0. It never silently benchmarks a later beta.
 
 ## Controls and evidence
 
@@ -43,6 +37,16 @@ The initial corpus uses the repository's documented deterministic examples:
 
 These exercise materially different parts of the thermodynamic multi-agent simulation. Add workloads only when their input seeds, environment and expected outputs are explicit.
 
+## Industry and SOTA comparison
+
+This project-specific corpus measures behavior that matters to Symtropy. It does not replace the Rust team's compiler benchmark suite.
+
+For compiler-level comparison, use the official `rustc-perf` workloads where practical. The Rust Compiler Development Guide describes fresh and incremental compilation comparisons across a collection of real crates, associated with exact compiler commit hashes. Use those results as the compiler ecosystem baseline, then compare the Symtropy simulation workloads as the application baseline.
+
+Use Cargo's `--timings` reports to identify critical-path crates, build-script bottlenecks and parallelism rather than attributing total build time to the compiler alone. Measure Cargo test orchestration separately from test binary runtime. A cargo-nextest comparison is a test-runner experiment, not a compiler-performance result.
+
+Measure sccache hit rates as a separate profile. Do not mix cache hits into the primary no-cache compiler comparison; sccache has distinct caching constraints, including incremental compilation and some linker/proc-macro cases.
+
 ## Interpretation
 
 Compare paired trial distributions, not one best run. Report median, interquartile range and confidence intervals. Keep compile time and runtime separate. A compiler that produces a faster build is not necessarily producing a faster simulation.
@@ -52,3 +56,12 @@ Compare stdout digests across repeated runs within each toolchain. Cross-toolcha
 Five paired runs are exploratory, not a robust tail-latency campaign. Do not report p99 from five repetitions. p99 claims require a much larger observation set or a justified statistical design. No performance target is enforced until a stable workstation baseline exists.
 
 This benchmark is opt-in and hardware-dependent. The CI qualification workflow does not claim to have executed a workstation performance campaign.
+
+## References
+
+- Rust compiler performance testing: https://rustc-dev-guide.rust-lang.org/tests/perf.html
+- rustc-perf profiling: https://rustc-dev-guide.rust-lang.org/profiling/with-rustc-perf.html
+- Cargo build timings: https://doc.rust-lang.org/stable/cargo/reference/timings.html
+- Cargo build performance guide: https://doc.rust-lang.org/cargo/guide/build-performance.html
+- sccache Rust caching constraints: https://github.com/mozilla/sccache/blob/main/docs/Rust.md
+- cargo-nextest benchmark considerations: https://nexte.st/docs/benchmarks/
