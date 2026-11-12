@@ -237,3 +237,24 @@ jobs:
           rustup run nightly-2026-11-11 cargo -Vv
       - name: Exercise old-version fallback, fresh-only rejection and lockfile exception
         run: bash scripts/test-cargo-publish-age.sh nightly-2026-11-11
+
+  curvature-example-feature-contract:
+    name: Curvature example feature contract (stable and beta)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: ["1.99.1", "1.101.0-beta.1"]
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ matrix.rust }}
+      - name: Check feature-gated curvature example
+        run: cargo +${{ matrix.rust }} check --locked --example curvature_selforg --features consciousness-curvature
