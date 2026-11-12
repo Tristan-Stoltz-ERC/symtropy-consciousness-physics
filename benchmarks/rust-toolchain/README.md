@@ -1,8 +1,8 @@
-# Paired Rust toolchain benchmark v0.2
+# Paired Rust toolchain benchmark v0.3
 
-This harness compares exact Rust compiler/Cargo toolchains on the same clean source revision and unchanged Cargo.lock. The primary comparison is Rust 1.99.1 versus Rust 1.100.0 stable.
+This harness compares exact Rust compiler/Cargo toolchains on the same clean source revision and unchanged Cargo.lock. The established baseline is Rust 1.99.1. Rust 1.100.0 is a candidate only after it appears in the official stable distribution.
 
-To compare them:
+For the exact comparison, after the release is published:
 
 ```sh
 rustup toolchain install 1.99.1 --profile minimal
@@ -11,7 +11,7 @@ BUILD_REPEATS=5 RUNTIME_REPEATS=5 \
   bash scripts/benchmark-rust-1.99.1-vs-1.100.0.sh
 ```
 
-The wrapper refuses to run unless both `rustc` and Cargo identify as exactly 1.100.0 for the candidate.
+The wrapper refuses to run unless both `rustc` and Cargo identify as exactly 1.100.0 for the candidate. It never follows the moving `stable` or `beta` aliases during measurement.
 
 ## Controls and evidence
 
@@ -57,7 +57,7 @@ Compare stdout digests across repeated runs within each toolchain. Cross-toolcha
 
 Five paired runs are exploratory, not a robust tail-latency campaign. Do not report p99 from five repetitions. p99 claims require a much larger observation set or a justified statistical design. No performance target is enforced until a stable workstation baseline exists.
 
-This benchmark is opt-in and hardware-dependent. The CI qualification workflow does not claim to have executed a workstation performance campaign.
+This benchmark is opt-in and hardware-dependent. CI qualification does not claim to have executed a workstation performance campaign.
 
 ## References
 
