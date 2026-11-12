@@ -1,31 +1,40 @@
-# Rust toolchain qualification v0.4: stable 1.99.1 baseline, 1.100.0 release candidate, 1.101 beta canary
+# Rust toolchain qualification v0.5: stable 1.99.1, scheduled 1.100.0 release, 1.101 beta canary
 
-**Status:** Rust/Cargo 1.99.1 is the previously verified project baseline. Rust 1.100.0 is now officially published (2026-11-12) and is undergoing exact-head qualification. The project default remains unchanged until the candidate clears all gates. Rust 1.101.0-beta.1 is a separate, non-blocking forward-compatibility canary.
+**Status at the latest hosted observation on 2026-11-12:** Rust/Cargo 1.99.1 remains the only verified published stable toolchain available to this workflow. Rust 1.100.0 has a scheduled stable date of November 12, but the official release-notes tracker is still marked as a draft and the exact distribution install returns HTTP 404. Rust/Cargo 1.101.0-beta.1 is a separate, non-blocking forward-compatibility canary. The project default remains unchanged.
 
-## Release-day chronology and evidence
+## Release schedule versus distribution availability
 
-1. Earlier on 2026-11-12, GitHub Actions verified Rust/Cargo 1.99.1 as the published stable channel. At that observation, an exact `rustup toolchain install 1.100.0` attempt returned HTTP 404 and beta resolved to 1.101.0-beta.1. We correctly skipped candidate checks then.
-2. Later on 2026-11-12, the official Rust release notes published **Version 1.100.0 (2026-11-12)**. The Rust Forge schedule also placed 1.100.0's stable date on November 12.
-3. The release gate in this PR discovers the actual stable channel. On this updated head it should now identify 1.100.0 and execute the exact candidate checks; the run result is the authority for install/build availability. Do not transfer the earlier 1.99.1 or beta smoke results to 1.100.0.
+The evidence must be kept distinct:
 
-The 1.100.0 release notes are available at https://dev-doc.rust-lang.org/releases.html. The release announcement index at https://blog.rust-lang.org/releases/ may lag the compiler release notes on release day; do not use its stale list alone to infer that the distribution is unavailable.
+1. The official Rust Forge release table lists Stable 1.99 and Beta 1.100, with 1.100 scheduled to become stable on November 12, 2026.
+2. The Rust 1.100.0 release-notes tracking issue is explicitly titled "Draft release notes for 1.100.0". It contains the expected version/date and proposed Cargo/compiler changes, but is not an official stable distribution announcement.
+3. On the latest hosted qualification run, the stable channel resolves to rustc 1.99.1 / Cargo 1.99.1.
+4. A direct `rustup toolchain install 1.100.0` attempt, independent of the moving stable alias, returns HTTP 404 for the official static distribution checksum.
+5. Therefore, exact 1.100.0 qualification is **NOT AVAILABLE / NOT RUN** at that observation. The scheduled release date must not be represented as proof of publication, installation or compatibility.
 
-## 1.100 capabilities to qualify
+Sources:
+- Rust Forge release schedule: https://forge.rust-lang.org/
+- Draft Rust 1.100 release-notes tracker: https://github.com/rust-lang/rust/issues/163811
+- Official release announcement index: https://blog.rust-lang.org/releases/
 
-The 1.100 release notes introduce:
-1. Cargo's own lint framework and the `cargo::unused_dependencies` lint configured through `[lints.cargo]`.
-2. Minimum publish-age dependency cooldown configuration. The resolver ignores versions newer than the configured minimum publish age unless the version is already present in Cargo.lock.
-3. A new intermediate build-artifact directory layout. It is internal, not a stable interface; tooling should consume Cargo's `compiler-artifact` JSON messages.
-4. Stabilization of the never type and related inference changes.
-5. Stabilized `extern "custom"` and other compiler/library updates listed in the official release notes.
+The workflow separately records the live stable-channel identity and directly attempts exact 1.100.0 installation. When the exact distribution becomes available, the job must assert both rustc and Cargo are exactly 1.100.0 before any candidate checks run. A stale stable alias can no longer prevent the exact candidate from being attempted.
 
-The isolated unused-dependency fixture declares a local path dependency not referenced by the fixture source and requires Cargo to emit the expected warning. This test already passed under Rust/Cargo 1.101.0-beta.1; the exact 1.100.0 run remains separately required.
+## 1.100 capabilities to qualify when published
+
+The draft release-notes tracker identifies these planned changes:
+1. Cargo's native lint framework, including `cargo::unused_dependencies` under `[lints.cargo]`.
+2. Minimum publish-age/dependency cooldown configuration; the resolver ignores versions that are too recent unless already present in Cargo.lock.
+3. A new intermediate build-artifact directory layout. This is an internal layout; consumers should use Cargo JSON `compiler-artifact` messages instead of guessing private directories.
+4. Never-type stabilization and associated compiler/library changes.
+5. Stabilized `extern "custom"` and other language/library updates listed in the tracker.
+
+These are draft release-note entries until stable publication is verified. The isolated Cargo lint fixture has already passed under Rust/Cargo 1.101.0-beta.1; this is beta evidence only and does not imply 1.100.0 availability.
 
 ## Cargo publication-age policy
 
-The opt-in canary configures a 14-day minimum publish age and `resolver.incompatible-publish-age = "deny"`. Existing locked versions remain usable, while newly resolved too-recent versions should be ignored. The current workspace fetch exercises the locked-graph path. A deterministic local sparse-registry negative control with a deliberately too-new `pubtime` is still required before claiming the resolver rejects such a version in our own test corpus.
+The opt-in canary configures a 14-day minimum publish age and `resolver.incompatible-publish-age = "deny"`. Existing locked versions remain usable, while newly resolved too-recent versions should be ignored. The current workspace fetch exercises the locked-graph path. A deterministic local sparse-registry negative control with a deliberately too-new `pubtime` remains necessary before claiming the resolver rejects such a version in our own test corpus.
 
-Do not treat a green locked fetch as proof that the negative-control behavior works.
+A green locked fetch is not proof that the negative-control behavior works.
 
 ## Build artifact interface
 
@@ -44,12 +53,13 @@ Rust 1.99.1 fixed an x86_64 FFI `bool` return-value miscompilation where upper r
 Hosted evidence:
 - Rust 1.99.1 baseline raw-register probe: PASS.
 - Rust 1.101.0-beta.1 isolated raw-register probe: PASS.
-- Rust 1.100.0 exact stable probe: pending the current release-gated run.
+- Rust 1.100.0 exact stable probe: NOT RUN because exact distribution installation returned 404.
 
 ## Qualification gates
 
-- Discover and record exact published stable rustc/Cargo identity.
-- Run Rust 1.100.0 only when both rustc and Cargo identify as 1.100.0.
+- Record the live stable-channel rustc/Cargo identity.
+- Attempt exact Rust 1.100.0 distribution installation independently of the stable alias.
+- Run Rust 1.100.0 only when both rustc and Cargo identify as exactly 1.100.0.
 - Keep default `rust-toolchain.toml`, Cargo.toml and Cargo.lock unchanged.
 - Require locked metadata, all-target check, tests, Clippy and rustdoc.
 - Require raw x86_64 ABI probe.
@@ -65,9 +75,9 @@ Rust/Cargo 1.101.0-beta.1 installed and fetched the locked dependency graph succ
 
 `examples/hdc_cooperation.rs` imports `symtropy_consciousness_physics::hdc_context`, which is not exported by the crate root. This is tracked separately in issue #3. It is not attributed to the compiler, and the all-target check has not been weakened. The isolated beta ABI/Cargo-lint/artifact smoke job passed independently.
 
-## Performance research: compare both the compiler and the application
+## Performance research: compare compiler and application separately
 
-The exact 1.99.1 versus 1.100.0 benchmark is available only after the release distribution is present:
+The exact 1.99.1 versus 1.100.0 benchmark must wait until the 1.100.0 distribution exists:
 
 ```sh
 rustup toolchain install 1.99.1 --profile minimal
@@ -81,12 +91,12 @@ The wrapper refuses to run unless rustc and Cargo both identify as exact 1.100.0
 Compare:
 - upstream rustc-perf fresh/incremental workloads for compiler-wide performance;
 - Cargo `--timings` for build-graph and critical-path diagnosis;
-- compile wall time, CPU time, peak RSS, build dir size and final binary size;
+- compile wall time, CPU time, peak RSS, build directory size and final binary size;
 - deterministic Symtropy release simulation runtime and numerical outcomes;
 - fixed-seed determinism and independent-build reproducibility;
 - cache hit/miss separately from uncached compiler performance.
 
-Five trials are exploratory only. Do not claim p99 from five measurements. No performance gain is assumed from the version number.
+Five trials are exploratory only. Do not claim p99 from five measurements. Use 30+ independent paired runs for ordinary latency-distribution claims and at least 10,000 observations per condition (or a justified design) for p99. No performance gain is assumed from the version number.
 
 ## SOTA and promotion standard
 
@@ -96,7 +106,9 @@ Keep the 1.99.1 default until exact stable 1.100.0 checks pass and any candidate
 
 ## References
 
-- Official Rust 1.100 release notes: https://dev-doc.rust-lang.org/releases.html
+- Rust Forge release schedule: https://forge.rust-lang.org/
+- Rust 1.100 draft release-notes tracker: https://github.com/rust-lang/rust/issues/163811
+- Official Rust release announcements: https://blog.rust-lang.org/releases/
 - Rust compiler performance testing: https://rustc-dev-guide.rust-lang.org/tests/perf.html
 - rustc-perf profiling: https://rustc-dev-guide.rust-lang.org/profiling/with-rustc-perf.html
 - Cargo lints: https://doc.rust-lang.org/cargo/reference/lints.html
