@@ -10,8 +10,8 @@ trap 'rm -rf "$WORK"' EXIT
 cp -a "$FIXTURE/." "$WORK/"
 
 RUSTC_VERSION="$(rustup run "$TOOLCHAIN" rustc --version)"
-[[ "$RUSTC_VERSION" == "rustc $EXPECTED_VERSION "* ]] || {
-  echo "expected Rust $EXPECTED_VERSION via $TOOLCHAIN; got: $RUSTC_VERSION" >&2
+[[ "$RUSTC_VERSION" =~ ^rustc\ 1\.100\.0(-beta(\.[0-9]+)?)?\  ]] || {
+  echo "expected Rust 1.100.0 (optionally beta-suffixed) via $TOOLCHAIN; got: $RUSTC_VERSION" >&2
   exit 2
 }
 
