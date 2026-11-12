@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 TOOLCHAIN="${1:-nightly-2026-11-11}"
-EXPECTED_RUSTC_PREFIX="${2:-rustc 1.101.0-nightly }"
+EXPECTED_RUSTC_PREFIX="${2:-rustc 1.102.0-nightly }"
 ROOT="$(git rev-parse --show-toplevel)"
 WORK="$(mktemp -d)"
 SERVER_PID=""
@@ -26,8 +26,8 @@ CARGO_VERSION="$(rustup run "$TOOLCHAIN" cargo --version)"
   echo "Expected exact dated nightly compiler prefix '$EXPECTED_RUSTC_PREFIX'; got: $RUSTC_VERSION" >&2
   exit 2
 }
-[[ "$CARGO_VERSION" == cargo\ 1.101.0-nightly\ * ]] || {
-  echo "Expected Cargo 1.101.0-nightly paired with the compiler; got: $CARGO_VERSION" >&2
+[[ "$CARGO_VERSION" == cargo\ 1.102.0-nightly\ * ]] || {
+  echo "Expected Cargo 1.102.0-nightly paired with the compiler; got: $CARGO_VERSION" >&2
   exit 2
 }
 
