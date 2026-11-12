@@ -24,6 +24,8 @@ pub mod dimensional_leakage;
 pub mod energy;
 pub mod fep_gradient;
 pub mod harmony_field;
+#[cfg(feature = "consciousness-hdc")]
+pub mod hdc_context;
 pub mod prey;
 pub mod safety;
 pub mod sanctuary;
