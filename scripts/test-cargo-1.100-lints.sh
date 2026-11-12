@@ -4,9 +4,10 @@ set -Eeuo pipefail
 TOOLCHAIN="${1:-beta}"
 EXPECTED_VERSION="${2:-1.100.0}"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || realpath "$(dirname "$0")/..")"
-MANIFEST="$ROOT/tests/toolchain/cargo-lints/Cargo.toml"
+FIXTURE="$ROOT/tests/toolchain/cargo-lints"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+cp -a "$FIXTURE/." "$WORK/"
 
 RUSTC_VERSION="$(rustup run "$TOOLCHAIN" rustc --version)"
 [[ "$RUSTC_VERSION" == "rustc $EXPECTED_VERSION "* ]] || {
@@ -17,7 +18,7 @@ RUSTC_VERSION="$(rustup run "$TOOLCHAIN" rustc --version)"
 LOG="$WORK/cargo-lint.log"
 set +e
 rustup run "$TOOLCHAIN" cargo check \
-  --manifest-path "$MANIFEST" \
+  --manifest-path "$WORK/Cargo.toml" \
   --offline \
   --message-format=short > "$LOG" 2>&1
 status=$?
