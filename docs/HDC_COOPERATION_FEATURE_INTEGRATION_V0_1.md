@@ -21,7 +21,7 @@ The initial compile failure was not an absent source file. It was a missing inte
 ## Integration change
 
 The branch adds:
-- exact optional dependency `symthaea-core = 0.5.1`, with default features disabled;
+- exact optional dependency `symthaea-core = 0.5.1`, with default features disabled and only its `parallel` feature enabled (the published HDC modules currently import Rayon unconditionally);
 - opt-in feature `consciousness-hdc = ["dep:symthaea-core"]`;
 - `#[cfg(feature = "consciousness-hdc")] pub mod hdc_context;`;
 - `[[example]] hdc_cooperation` with `required-features = ["consciousness-hdc"]`.
