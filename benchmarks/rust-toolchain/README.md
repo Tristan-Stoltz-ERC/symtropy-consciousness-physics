@@ -26,6 +26,28 @@ The wrapper refuses to run unless both `rustc` and Cargo identify as exactly 1.1
 
 The page cache is not dropped. Results are fresh-target / warmed-registry, not cold-machine or cold-disk. If GNU time is missing, RSS is NA and is not fabricated.
 
+## Reproducible analysis
+
+The raw CSV is analyzed by a dependency-free Rust program:
+
+```sh
+RUSTC_TOOLCHAIN=1.99.1 bash scripts/analyze-rust-toolchain-benchmark.sh \
+  benchmark-results/rust-toolchain/run-<id>/results/measurements.csv \
+  1.99.1 1.100.0
+```
+
+The analyzer:
+- pairs baseline and candidate by exact trial number and example;
+- de-duplicates build metrics repeated on each runtime row;
+- checks that runtime repeat numbers are contiguous;
+- rejects inconsistent build metadata or within-trial output-digest instability;
+- summarizes per-trial runtime medians, median absolute deviation and paired speedup ratios;
+- computes a deterministic bootstrap interval for the median paired runtime speedup;
+- reports RSS, target-directory and executable-size comparisons;
+- reports p99 only when both conditions have at least 10,000 runtime observations.
+
+Its self-test runs in the hosted 1.101.0-beta.1 smoke lane and checks known speedup ratios, digest stability, malformed-digest rejection and the small-sample p99 guard. The analyzer does not add a Cargo dependency or modify Cargo.lock.
+
 ## Workloads
 
 - `gradient_replacement`
