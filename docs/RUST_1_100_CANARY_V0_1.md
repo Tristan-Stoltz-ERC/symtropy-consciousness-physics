@@ -46,9 +46,20 @@ The pinned `nightly-2026-11-11` job runs Cargo's `-Zmin-publish-age` experiment 
 2. **Fresh-only rejection:** when the only compatible version is one hour old, deny must fail specifically because the version is too new.
 3. **Existing-lock exception:** the fresh-only release is first selected using the explicit `allow` override and written to Cargo.lock; a later `--locked` resolution under deny must preserve it.
 
-The test uses an exact dated nightly because the full `min-publish-age` feature is still documented under Cargo's unstable-feature reference. This is research evidence for Cargo's resolver semantics, not a statement that the feature is available on stable Rust 1.100.0. The job is non-blocking and its three controls are reported independently.
+**Hosted exact-head result: PASS** on run [#43267753894](https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physics/actions/runs/43267753894), job `Cargo publish-age deterministic negative controls (dated nightly)`.
 
-The RFC notes that this check applies to registries that publish `pubtime`; it does not apply to path/git dependencies or registries without publish-time metadata. The test registry deliberately includes `pubtime` to make that prerequisite explicit.
+The dated selector `nightly-2026-11-11` installed:
+- rustc `1.102.0-nightly (9c5648833 2026-11-10)`;
+- Cargo `1.102.0-nightly (c07ac2c4d 2026-11-06)`.
+
+All three controls passed:
+- `publish_age_old_version_fallback=PASS`: Cargo chose `age-choice 0.1.0` over `0.2.0` published one hour earlier.
+- `publish_age_fresh_only_rejected=PASS`: Cargo rejected the only available version and reported that it was too new (published one hour ago; minimum age 14 days).
+- `publish_age_existing_lock_exception=PASS`: after the explicit `allow` resolution wrote `fresh-only 0.1.0` to Cargo.lock, a subsequent `--locked` resolution under `deny` preserved it.
+
+The test uses an exact dated nightly because the full `min-publish-age` feature is still documented under Cargo's unstable-feature reference. This is research evidence for Cargo's resolver semantics, not a statement that the feature is available on stable Rust 1.100.0 or that a stable 1.100.0 distribution exists.
+
+The test registry is a disposable sparse registry served only on `127.0.0.1`; it publishes explicit `pubtime` values and does not contact crates.io. The RFC notes that this check applies to registries that publish `pubtime`; it does not apply to path/git dependencies or registries without publish-time metadata.
 
 ## Build artifact interface
 
