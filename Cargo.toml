@@ -10,11 +10,13 @@ repository = "https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physi
 symtropy-math = { path = "crates/symtropy-math" }
 symtropy-physics = { path = "crates/symtropy-physics" }
 symthaea-consciousness-equation = { path = "crates/symthaea-consciousness-equation" }
+symthaea-core = { version = "=0.5.1", default-features = false, features = ["parallel"], optional = true }
 nalgebra = "0.34"
 
 [features]
 default = []
 consciousness-curvature = []
+consciousness-hdc = ["dep:symthaea-core"]
 
 [dev-dependencies]
 proptest = "1.4"
@@ -25,3 +27,9 @@ proptest = "1.4"
 name = "curvature_selforg"
 path = "examples/curvature_selforg.rs"
 required-features = ["consciousness-curvature"]
+
+# HDC/LTC integration example: reuse the canonical Symthaea core implementation.
+[[example]]
+name = "hdc_cooperation"
+path = "examples/hdc_cooperation.rs"
+required-features = ["consciousness-hdc"]

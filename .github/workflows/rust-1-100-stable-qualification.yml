@@ -258,3 +258,58 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Check feature-gated curvature example
         run: cargo +${{ matrix.rust }} check --locked --example curvature_selforg --features consciousness-curvature
+
+  hdc-feature-lock-resolution:
+    name: Resolve and qualify the opt-in HDC feature (Cargo-generated lockfile)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact HDC integration source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact Rust 1.99.1 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup run 1.99.1 rustc -Vv
+          rustup run 1.99.1 cargo -Vv
+
+      - name: Resolve opt-in HDC graph and compile example (Cargo may update Cargo.lock)
+        id: hdc
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup run 1.99.1 cargo check \
+            --example hdc_cooperation \
+            --features consciousness-hdc
+          rustup run 1.99.1 cargo test --lib --features consciousness-hdc
+          rustup run 1.99.1 cargo tree --locked --features consciousness-hdc > "$RUNNER_TEMP/hdc-cargo-tree.txt"
+          sha256sum Cargo.lock | tee "$RUNNER_TEMP/hdc-cargo-lock.sha256"
+
+      - name: Record Cargo resolution result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## HDC optional-feature resolution"
+            echo
+            echo "- Cargo feature compile outcome: ${{ steps.hdc.outcome }}"
+            echo "- Cargo.lock SHA-256: $(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "- This job intentionally does not use --locked for the first resolution. The generated lockfile is uploaded for review, never hand-edited."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Cargo-generated lockfile and resolution diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: symtropy-hdc-cargo-resolution
+          path: |
+            Cargo.lock
+            ${{ runner.temp }}/hdc-cargo-tree.txt
+            ${{ runner.temp }}/hdc-cargo-lock.sha256
+          if-no-files-found: error
+          retention-days: 1
