@@ -1,27 +1,29 @@
 # Paired Rust toolchain benchmark v0.2
 
-This harness compares exact Rust compiler/Cargo toolchains on the same clean source revision and unchanged Cargo.lock. The default comparison remains Rust 1.96.1 vs 1.99.1.
+This harness compares exact Rust compiler/Cargo toolchains on the same clean source revision and unchanged Cargo.lock. The primary comparison is Rust 1.99.1 versus Rust 1.100.0 stable.
 
-To compare the 1.99.1 stable baseline with the 1.100.0 beta candidate, use the exact-version wrapper:
+To compare them:
 
 ```sh
+rustup toolchain install 1.99.1 --profile minimal
+rustup toolchain install 1.100.0 --profile minimal
 BUILD_REPEATS=5 RUNTIME_REPEATS=5 \
-  bash scripts/benchmark-rust-1.99.1-vs-1.100.0-beta.sh
+  bash scripts/benchmark-rust-1.99.1-vs-1.100.0.sh
 ```
 
-The wrapper refuses to run unless `rustup run beta rustc --version` identifies as exactly 1.100.0. It never silently benchmarks a later beta.
+The wrapper refuses to run unless both `rustc` and Cargo identify as exactly 1.100.0 for the candidate.
 
 ## Controls and evidence
 
 The harness:
 - requires a clean worktree and records the exact Git commit;
 - records the Cargo.lock SHA-256 before and after the run;
-- records complete rustc -Vv and cargo -Vv for each toolchain;
+- records complete `rustc -Vv` and `cargo -Vv` for each toolchain;
 - warms the Cargo registry before measurements;
-- runs measured Cargo work offline and with --locked;
+- runs measured Cargo work offline and with `--locked`;
 - uses a fresh target directory for each toolchain/trial/example;
 - disables incremental compilation for the primary compiler comparison;
-- disables RUSTC_WRAPPER/RUSTC_WORKSPACE_WRAPPER so sccache is measured separately;
+- disables `RUSTC_WRAPPER` and `RUSTC_WORKSPACE_WRAPPER` so sccache is measured separately;
 - rotates toolchain order between trials;
 - records compile time, peak RSS where GNU time is available, target-directory size, binary size, release-example runtime and stdout SHA-256;
 - records kernel, CPU, memory, filesystem/mount and CPU governor metadata.
