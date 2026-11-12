@@ -1,16 +1,12 @@
 name: Rust 1.100 beta canary
-
 on:
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: rust-1-100-beta-canary-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   candidate:
     name: Rust 1.100 beta compatibility canary
@@ -23,13 +19,20 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
+      - name: Install stable baseline and verify raw x86_64 bool ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+          rustup run 1.99.1 rustc -Vv
+          rustup run 1.99.1 cargo -Vv
+          bash scripts/test-rust-ffi-bool.sh 1.99.1
       - name: Install beta toolchain and identify candidate
         id: candidate
         shell: bash
         run: |
           set -euo pipefail
-          rustup set profile minimal
           rustup toolchain install beta --profile minimal --component rustfmt --component clippy
           RUSTC_VERSION="$(rustup run beta rustc --version)"
           CARGO_VERSION="$(rustup run beta cargo --version)"
@@ -47,53 +50,42 @@ jobs:
             echo "- $CARGO_VERSION"
             echo "- commit $GITHUB_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
-
           if [[ "$RUSTC_VERSION" == "rustc 1.100.0 "* ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::The beta channel has moved beyond Rust 1.100.0; this 1.100.0 canary is skipped rather than testing a different release."
+            echo "::notice::The beta channel has moved beyond Rust 1.100.0; this canary is skipped rather than testing a different release."
           fi
-
-      - name: Fetch the existing lockfile under the 14-day publication cooldown
+      - name: Fetch existing lockfile under 14-day publication cooldown
         if: steps.candidate.outputs.ready == 'true'
         env:
           CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE: 14 days
           CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE: deny
         run: cargo +beta fetch --locked --config config/cargo-1.100-canary.toml
-
       - name: Locked workspace metadata
         if: steps.candidate.outputs.ready == 'true'
         run: cargo +beta metadata --locked --format-version 1 --no-deps --config config/cargo-1.100-canary.toml > /dev/null
-
-      - name: Compile all targets without changing dependencies
+      - name: Compile all targets
         if: steps.candidate.outputs.ready == 'true'
         run: cargo +beta check --locked --all-targets --config config/cargo-1.100-canary.toml
-
       - name: Run all targets
         if: steps.candidate.outputs.ready == 'true'
         run: cargo +beta test --locked --all-targets --config config/cargo-1.100-canary.toml
-
       - name: Run Clippy
         if: steps.candidate.outputs.ready == 'true'
         run: cargo +beta clippy --locked --all-targets --config config/cargo-1.100-canary.toml
-
       - name: Build rustdoc
         if: steps.candidate.outputs.ready == 'true'
         run: cargo +beta doc --locked --no-deps --config config/cargo-1.100-canary.toml
-
-      - name: Verify the x86_64 C ABI bool return register
+      - name: Verify raw x86_64 C ABI bool return register
         if: steps.candidate.outputs.ready == 'true'
         run: bash scripts/test-rust-ffi-bool.sh beta 1.100.0
-
       - name: Exercise Cargo-native unused dependency lint
         if: steps.candidate.outputs.ready == 'true'
-        run: bash scripts/test-cargo-1.100-lints.sh beta
-
+        run: bash scripts/test-cargo-1.100-lints.sh beta 1.100.0
       - name: Capture compiler artifacts through Cargo JSON messages
         if: steps.candidate.outputs.ready == 'true'
         run: bash scripts/capture-cargo-artifacts.sh beta "$RUNNER_TEMP/cargo-artifact-manifest"
-
       - name: Enforce Cargo.lock immutability
         if: steps.candidate.outputs.ready == 'true'
         shell: bash
@@ -102,13 +94,12 @@ jobs:
           git diff --exit-code -- Cargo.lock
           test -z "$(git status --porcelain -- Cargo.lock)"
           echo "Cargo.lock unchanged." >> "$GITHUB_STEP_SUMMARY"
-
       - name: Record candidate absence explicitly
         if: steps.candidate.outputs.ready != 'true'
         run: |
           {
             echo "## Canary skipped"
             echo
-            echo "The installed beta channel no longer identifies as Rust 1.100.0."
+            echo "The beta channel no longer identifies as Rust 1.100.0."
             echo "No alternative version was silently substituted."
           } >> "$GITHUB_STEP_SUMMARY"
