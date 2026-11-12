@@ -356,9 +356,9 @@ fn self_test() -> Result<(), String> {
         ] {
             for (repeat, runtime_ms) in [(1, runtime_a), (2, runtime_b)] {
                 csv.push_str(&format!(
-                    "{},{},hdc_smoke,{},{},2000,500,{}, {},{}\n",
+                    "{},{},hdc_smoke,{},{},2000,500,{},{},{}\n",
                     toolchain, trial, build_ms, rss, repeat, runtime_ms, digest
-                ).replace(", ", ","));
+                ));
             }
         }
     }
