@@ -25,6 +25,10 @@ jobs:
           set -euo pipefail
           rustup set profile minimal
           rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+          STABLE_RUSTC="$(rustup run 1.99.1 rustc --version)"
+          STABLE_CARGO="$(rustup run 1.99.1 cargo --version)"
+          [[ "$STABLE_RUSTC" == "rustc 1.99.1 "* ]]
+          [[ "$STABLE_CARGO" == "cargo 1.99.1 "* ]]
           rustup run 1.99.1 rustc -Vv
           rustup run 1.99.1 cargo -Vv
           bash scripts/test-rust-ffi-bool.sh 1.99.1
@@ -50,11 +54,11 @@ jobs:
             echo "- $CARGO_VERSION"
             echo "- commit $GITHUB_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$RUSTC_VERSION" == "rustc 1.100.0 "* ]]; then
+          if [[ "$RUSTC_VERSION" =~ ^rustc\ 1\.100\.0(-beta(\.[0-9]+)?)?\  && "$CARGO_VERSION" =~ ^cargo\ 1\.100\.0(-beta(\.[0-9]+)?)?\  ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::The beta channel has moved beyond Rust 1.100.0; this canary is skipped rather than testing a different release."
+            echo "::notice::Beta did not resolve to a matching Rust/Cargo 1.100.0 toolchain; candidate tests are skipped."
           fi
       - name: Fetch existing lockfile under 14-day publication cooldown
         if: steps.candidate.outputs.ready == 'true'
@@ -100,6 +104,6 @@ jobs:
           {
             echo "## Canary skipped"
             echo
-            echo "The beta channel no longer identifies as Rust 1.100.0."
+            echo "The beta channel did not identify as matching Rust/Cargo 1.100.0."
             echo "No alternative version was silently substituted."
           } >> "$GITHUB_STEP_SUMMARY"
