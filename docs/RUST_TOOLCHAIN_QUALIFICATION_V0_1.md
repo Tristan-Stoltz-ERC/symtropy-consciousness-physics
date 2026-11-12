@@ -29,11 +29,23 @@ Do not confuse three different versions:
 
 The upgrade does not change Cargo.lock, dependency versions, package edition or declared MSRV. A future MSRV should be chosen only after dependency metadata and source compatibility have been checked.
 
+## Existing formatting baseline
+
+The first hosted run on the initial PR merge head installed the exact Rust 1.99.1 toolchain successfully, then stopped at `cargo fmt --all -- --check`. The output showed pre-existing formatting differences across unrelated files in the source snapshot. That is repository formatting debt, not evidence of a compiler incompatibility.
+
+This toolchain PR deliberately does not mass-reformat simulation code or alter scientific source. It now:
+- requires rustfmt on the newly added ABI probe;
+- reports the full-workspace formatter result as a non-blocking baseline warning;
+- continues to locked compilation, tests, Clippy, documentation and ABI checks.
+
+Workspace-wide formatting cleanup should be reviewed as a separate source-only change, with determinism/output checks preserved.
+
 ## Required qualification
 
 The pinned stable lane runs:
 - rustc/Cargo/rustfmt/Clippy version checks;
-- formatting and locked dependency metadata checks;
+- formatting of the new ABI probe and a visible whole-workspace formatting baseline;
+- locked dependency metadata checks;
 - all-target compilation and tests;
 - Clippy and rustdoc;
 - the x86_64 C ABI bool smoke test.
