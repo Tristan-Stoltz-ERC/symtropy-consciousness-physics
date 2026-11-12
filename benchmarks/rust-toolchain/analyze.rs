@@ -197,6 +197,20 @@ fn build_groups(rows: &[Row]) -> Result<BTreeMap<(String, u64, String), BuildGro
     Ok(groups)
 }
 
+fn quantile_u64(values: &[u64], probability: f64) -> Option<u64> {
+    if values.is_empty() {
+        return None;
+    }
+    if !(0.0..=1.0).contains(&probability) {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_unstable();
+    // Nearest-rank quantile: rank = ceil(p * n), converted to zero-based index.
+    let rank = ((probability * sorted.len() as f64).ceil() as usize).max(1);
+    Some(sorted[(rank - 1).min(sorted.len() - 1)])
+}
+
 fn median_optional(values: &[Option<u64>]) -> Option<f64> {
     let present: Vec<f64> = values.iter().filter_map(|value| value.map(|n| n as f64)).collect();
     if present.is_empty() { None } else { Some(median(&present)) }
