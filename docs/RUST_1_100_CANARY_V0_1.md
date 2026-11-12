@@ -36,6 +36,20 @@ The opt-in canary configures a 14-day minimum publish age and `resolver.incompat
 
 A green locked fetch is not proof that the negative-control behavior works.
 
+### Executable local-registry negative control
+
+The branch now includes `scripts/test-cargo-publish-age.sh`. It creates a disposable sparse registry served only on loopback, and writes explicit `pubtime` values into its index entries. No crates.io traffic is required.
+
+The pinned `nightly-2026-11-11` job runs Cargo's `-Zmin-publish-age` experiment and tests three independent outcomes:
+
+1. **Old-version fallback:** a 30-day-old release and a one-hour-old release both satisfy the semver requirement; a 14-day deny policy must select the older release.
+2. **Fresh-only rejection:** when the only compatible version is one hour old, deny must fail specifically because the version is too new.
+3. **Existing-lock exception:** the fresh-only release is first selected using the explicit `allow` override and written to Cargo.lock; a later `--locked` resolution under deny must preserve it.
+
+The test uses an exact dated nightly because the full `min-publish-age` feature is still documented under Cargo's unstable-feature reference. This is research evidence for Cargo's resolver semantics, not a statement that the feature is available on stable Rust 1.100.0. The job is non-blocking and its three controls are reported independently.
+
+The RFC notes that this check applies to registries that publish `pubtime`; it does not apply to path/git dependencies or registries without publish-time metadata. The test registry deliberately includes `pubtime` to make that prerequisite explicit.
+
 ## Build artifact interface
 
 Cargo's intermediate build directory is internal and may change. Tooling should consume `compiler-artifact` JSON messages emitted by:
