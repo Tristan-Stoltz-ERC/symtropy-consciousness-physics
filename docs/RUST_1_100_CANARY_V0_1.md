@@ -75,6 +75,26 @@ Rust/Cargo 1.101.0-beta.1 installed and fetched the locked dependency graph succ
 
 `examples/hdc_cooperation.rs` imports `symtropy_consciousness_physics::hdc_context`, which is not exported by the crate root. This is tracked separately in issue #3. It is not attributed to the compiler, and the all-target check has not been weakened. The isolated beta ABI/Cargo-lint/artifact smoke job passed independently.
 
+## Reproducible paired-result analysis
+
+The benchmark output is not just a set of fastest-run numbers. The dependency-free Rust analyzer is compiled and self-tested in the isolated 1.101.0-beta.1 smoke lane:
+
+```sh
+RUSTC_TOOLCHAIN=1.99.1 bash scripts/analyze-rust-toolchain-benchmark.sh --self-test
+```
+
+For a completed run:
+
+```sh
+RUSTC_TOOLCHAIN=1.99.1 bash scripts/analyze-rust-toolchain-benchmark.sh \
+  benchmark-results/rust-toolchain/run-<id>/results/measurements.csv \
+  1.99.1 1.100.0
+```
+
+It pairs trials by exact trial/example key, de-duplicates build-level measurements, verifies contiguous runtime repeats, rejects unstable within-trial stdout digests and inconsistent build metadata, and calculates median/MAD and paired speedup estimates with a deterministic bootstrap interval. It includes peak RSS and artifact-size comparisons. p99 is withheld until both toolchains have at least 10,000 runtime observations for the workload.
+
+The analyzer is standard-library-only and does not alter Cargo.toml or Cargo.lock. Its output is still an engineering signal, not a scientific correctness proof: matching stdout digests do not replace numerical tolerance and invariant checks.
+
 ## Performance research: compare compiler and application separately
 
 The exact 1.99.1 versus 1.100.0 benchmark must wait until the 1.100.0 distribution exists:
