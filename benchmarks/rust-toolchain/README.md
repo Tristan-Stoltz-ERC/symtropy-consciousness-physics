@@ -1,6 +1,6 @@
-# Paired Rust toolchain benchmark v0.4
+# Paired Rust toolchain benchmark v0.5
 
-Compares exact Rust/Cargo 1.99.1 and 1.100.0 on the same clean source revision and unchanged Cargo.lock. Rust 1.100.0 was officially published on 2026-11-12. The default project toolchain is not changed by this benchmark.
+Compares exact Rust/Cargo 1.99.1 and 1.100.0 on the same clean source revision and unchanged Cargo.lock. Rust 1.100.0 has a scheduled stable date of 2026-11-12, but at the latest hosted observation its release-notes tracker was still a draft and exact installation returned HTTP 404. Do not run or label a 1.100.0 performance comparison until the exact distribution is available.
 
 ```sh
 rustup toolchain install 1.99.1 --profile minimal
@@ -48,6 +48,9 @@ Five runs are exploratory. No p99 claim is justified from five observations. Use
 
 ## References
 
+- Rust Forge release schedule: https://forge.rust-lang.org/
+- Rust 1.100 draft release-notes tracker: https://github.com/rust-lang/rust/issues/163811
+- Official Rust release announcements: https://blog.rust-lang.org/releases/
 - Rust compiler performance testing: https://rustc-dev-guide.rust-lang.org/tests/perf.html
 - rustc-perf profiling: https://rustc-dev-guide.rust-lang.org/profiling/with-rustc-perf.html
 - Cargo build timings: https://doc.rust-lang.org/stable/cargo/reference/timings.html
