@@ -1,0 +1,94 @@
+name: Rust Toolchain Qualification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-toolchain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-1-99-1:
+    name: Rust 1.99.1 / locked workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # Cargo 1.99 disables incremental compilation automatically in CI.
+      # Make this comparison condition explicit instead of relying on defaults.
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install 1.99.1 \
+            --profile minimal \
+            --component rustfmt \
+            --component clippy
+          rustc +1.99.1 -vV
+          cargo +1.99.1 -Vv
+          rustfmt +1.99.1 --version
+          clippy-driver +1.99.1 --version
+          rustc +1.99.1 --version | grep -F "rustc 1.99.1"
+          cargo +1.99.1 --version | grep -E '^cargo 1\.99([.]1)?'
+
+      - name: Record build environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "runner=$ImageOS/$ImageVersion"
+            echo "kernel=$(uname -srmo)"
+            echo "cpu=$(lscpu | grep -m1 'Model name:' | sed 's/^[^:]*:[[:space:]]*//')"
+            echo "rustc=$(rustc +1.99.1 --version)"
+            echo "cargo=$(cargo +1.99.1 --version)"
+            echo "cargo_incremental=$CARGO_INCREMENTAL"
+          } | tee "$RUNNER_TEMP/rust-toolchain-environment.txt"
+
+      - name: Check formatting of the new ABI probe
+        run: rustfmt +1.99.1 --check tests/toolchain/ffi_bool.rs
+
+      # The pre-existing repository has broad rustfmt debt. Keep that baseline
+      # visible without making an unrelated mass-format change a prerequisite
+      # for testing the compiler upgrade.
+      - name: Report whole-workspace formatting baseline
+        shell: bash
+        run: |
+          if cargo +1.99.1 fmt --all -- --check; then
+            echo "workspace_format=PASS"
+          else
+            echo "::warning::Existing workspace rustfmt debt detected; tracked separately from Rust 1.99.1 compatibility."
+            echo "workspace_format=LEGACY_DEBT"
+          fi
+
+      - name: Validate locked dependency metadata
+        run: cargo +1.99.1 metadata --format-version 1 --locked --no-deps > /dev/null
+
+      - name: Compile all targets
+        run: cargo +1.99.1 check --locked --all-targets
+
+      - name: Run tests
+        run: cargo +1.99.1 test --locked --all-targets
+
+      - name: Run Clippy
+        run: cargo +1.99.1 clippy --locked --all-targets
+
+      - name: Build documentation
+        run: cargo +1.99.1 doc --locked --no-deps
+
+      - name: Qualify x86_64 C ABI bool returns
+        run: bash ./scripts/test-rust-ffi-bool.sh 1.99.1
