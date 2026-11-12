@@ -10,7 +10,7 @@ repository = "https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physi
 symtropy-math = { path = "crates/symtropy-math" }
 symtropy-physics = { path = "crates/symtropy-physics" }
 symthaea-consciousness-equation = { path = "crates/symthaea-consciousness-equation" }
-symthaea-core = { version = "=0.5.1", default-features = false, optional = true }
+symthaea-core = { version = "=0.5.1", default-features = false, features = ["parallel"], optional = true }
 nalgebra = "0.34"
 
 [features]
