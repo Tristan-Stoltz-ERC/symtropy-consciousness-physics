@@ -213,3 +213,7 @@ jobs:
         run: bash scripts/test-cargo-1.100-lints.sh 1.101.0-beta.1 1.101.0-beta.1
       - name: Capture Cargo artifact manifest from isolated fixture
         run: bash scripts/capture-cargo-artifacts.sh 1.101.0-beta.1 "$RUNNER_TEMP/cargo-artifact-smokes" tests/toolchain/cargo-lints/Cargo.toml
+      - name: Compile and self-test dependency-free paired benchmark analyzer
+        env:
+          RUSTC_TOOLCHAIN: 1.101.0-beta.1
+        run: bash scripts/analyze-rust-toolchain-benchmark.sh --self-test
