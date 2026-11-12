@@ -18,3 +18,10 @@ consciousness-curvature = []
 
 [dev-dependencies]
 proptest = "1.4"
+
+# This experiment consumes the curvature API, which is deliberately compiled
+# only when the consciousness-curvature feature is enabled.
+[[example]]
+name = "curvature_selforg"
+path = "examples/curvature_selforg.rs"
+required-features = ["consciousness-curvature"]
