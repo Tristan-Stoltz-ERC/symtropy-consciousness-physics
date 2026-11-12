@@ -27,6 +27,7 @@ struct BuildGroup {
     target_bytes: Option<u64>,
     binary_bytes: Option<u64>,
     runtime_ms: Vec<u64>,
+    runtime_repeats: Vec<u64>,
     digests: BTreeSet<String>,
 }
 
@@ -161,6 +162,7 @@ fn build_groups(rows: &[Row]) -> Result<BTreeMap<(String, u64, String), BuildGro
             target_bytes: row.target_bytes,
             binary_bytes: row.binary_bytes,
             runtime_ms: Vec::new(),
+            runtime_repeats: Vec::new(),
             digests: BTreeSet::new(),
         });
 
@@ -175,10 +177,16 @@ fn build_groups(rows: &[Row]) -> Result<BTreeMap<(String, u64, String), BuildGro
             ));
         }
         group.runtime_ms.push(row.runtime_ms);
+        group.runtime_repeats.push(row.runtime_repeat);
         group.digests.insert(row.stdout_sha256.clone());
     }
 
     for ((toolchain, trial, example), group) in &groups {
+        let mut repeats = group.runtime_repeats.clone();
+        repeats.sort_unstable();
+        if repeats.iter().enumerate().any(|(index, repeat)| *repeat != (index as u64 + 1)) {
+            return Err(format!("runtime_repeat sequence is not contiguous from 1: toolchain={} trial={} example={}", toolchain, trial, example));
+        }
         if group.digests.len() != 1 {
             return Err(format!(
                 "determinism failure: {} stdout digests within toolchain={} trial={} example={}",
@@ -219,8 +227,8 @@ fn analyze(rows: &[Row], baseline: &str, candidate: &str) -> Result<String, Stri
     report.push_str("- Build metrics are de-duplicated by toolchain/trial/example; runtime repeats are summarized within each build trial.\n");
     report.push_str("- Speedup is baseline time divided by candidate time; values above 1.0 favour the candidate.\n");
     report.push_str("- Confidence intervals use a deterministic percentile bootstrap over paired trial ratios. They are exploratory below 30 paired trials.\n\n");
-    report.push_str("| Example | Paired trials | Build median ms (base -> candidate) | Build speedup | Runtime median ms (base -> candidate) | Runtime speedup | 95% bootstrap CI (runtime) | Peak RSS KiB (base -> candidate) | Same digest trials |\n");
-    report.push_str("|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+    report.push_str("| Example | Paired trials | Build median ms (base -> candidate) | Build speedup | Runtime median ms (base -> candidate) | Runtime speedup | 95% bootstrap CI (runtime) | Peak RSS KiB (base -> candidate) | Target bytes (base -> candidate) | Binary bytes (base -> candidate) | Same digest trials |\n");
+    report.push_str("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
 
     for example in examples {
         let mut base_build = BTreeMap::new();
@@ -251,8 +259,13 @@ fn analyze(rows: &[Row], baseline: &str, candidate: &str) -> Result<String, Stri
         let mut runtime_speedups = Vec::new();
         let mut base_rss = Vec::new();
         let mut cand_rss = Vec::new();
+        let mut base_target_bytes = Vec::new();
+        let mut cand_target_bytes = Vec::new();
+        let mut base_binary_bytes = Vec::new();
+        let mut cand_binary_bytes = Vec::new();
+        let mut base_runtime_observations = Vec::new();
+        let mut cand_runtime_observations = Vec::new();
         let mut same_digest_trials = 0usize;
-        let mut runtime_observations = 0usize;
 
         for trial in &base_trials {
             let base = base_build[trial];
@@ -270,9 +283,14 @@ fn analyze(rows: &[Row], baseline: &str, candidate: &str) -> Result<String, Stri
             build_speedups.push(base.build_ms as f64 / cand.build_ms as f64);
             runtime_speedups.push(base_run / cand_run);
             if base.digests == cand.digests { same_digest_trials += 1; }
-            runtime_observations += base.runtime_ms.len() + cand.runtime_ms.len();
+            base_runtime_observations.extend(base.runtime_ms.iter().copied());
+            cand_runtime_observations.extend(cand.runtime_ms.iter().copied());
             base_rss.push(base.max_rss_kib);
             cand_rss.push(cand.max_rss_kib);
+            base_target_bytes.push(base.target_bytes);
+            cand_target_bytes.push(cand.target_bytes);
+            base_binary_bytes.push(base.binary_bytes);
+            cand_binary_bytes.push(cand.binary_bytes);
         }
 
         let build_speedup = median(&build_speedups);
@@ -280,7 +298,7 @@ fn analyze(rows: &[Row], baseline: &str, candidate: &str) -> Result<String, Stri
         let (ci_low, ci_high) = bootstrap_median_ci(&runtime_speedups);
 
         report.push_str(&format!(
-            "| {} | {} | {:.2} -> {:.2} | {:.3}x (MAD {:.3}) | {:.2} -> {:.2} | {:.3}x (MAD {:.3}) | [{:.3}, {:.3}] | {} -> {} | {}/{} |\n",
+            "| {} | {} | {:.2} -> {:.2} | {:.3}x (MAD {:.3}) | {:.2} -> {:.2} | {:.3}x (MAD {:.3}) | [{:.3}, {:.3}] | {} -> {} | {} -> {} | {} -> {} | {}/{} |\n",
             example,
             base_trials.len(),
             median(&base_build_ms),
@@ -295,6 +313,10 @@ fn analyze(rows: &[Row], baseline: &str, candidate: &str) -> Result<String, Stri
             ci_high,
             median_optional(&base_rss).map(|v| format!("{:.0}", v)).unwrap_or_else(|| "NA".to_string()),
             median_optional(&cand_rss).map(|v| format!("{:.0}", v)).unwrap_or_else(|| "NA".to_string()),
+            median_optional(&base_target_bytes).map(|v| format!("{:.0}", v)).unwrap_or_else(|| "NA".to_string()),
+            median_optional(&cand_target_bytes).map(|v| format!("{:.0}", v)).unwrap_or_else(|| "NA".to_string()),
+            median_optional(&base_binary_bytes).map(|v| format!("{:.0}", v)).unwrap_or_else(|| "NA".to_string()),
+            median_optional(&cand_binary_bytes).map(|v| format!("{:.0}", v)).unwrap_or_else(|| "NA".to_string()),
             same_digest_trials,
             base_trials.len()
         ));
@@ -302,8 +324,12 @@ fn analyze(rows: &[Row], baseline: &str, candidate: &str) -> Result<String, Stri
         if base_trials.len() < 30 {
             report.push_str(&format!("\n  - {}: exploratory only ({} paired trials); do not make a confirmatory performance claim.\n", example, base_trials.len()));
         }
-        if runtime_observations < 10_000 {
-            report.push_str(&format!("\n  - {}: p99 not reported ({} combined runtime observations; collect at least 10,000 per condition).\n", example, runtime_observations));
+        if base_runtime_observations.len() < 10_000 || cand_runtime_observations.len() < 10_000 {
+            report.push_str(&format!("\n  - {}: p99 not reported (baseline observations={}, candidate observations={}; collect at least 10,000 for each condition).\n", example, base_runtime_observations.len(), cand_runtime_observations.len()));
+        } else {
+            let base_p99 = quantile_u64(&base_runtime_observations, 0.99).unwrap_or(0);
+            let cand_p99 = quantile_u64(&cand_runtime_observations, 0.99).unwrap_or(0);
+            report.push_str(&format!("\n  - {}: empirical p99 runtime ms (baseline -> candidate): {} -> {}.\n", example, base_p99, cand_p99));
         }
         if same_digest_trials != base_trials.len() {
             report.push_str(&format!("\n  - {}: output digests differ in {} paired trials; inspect numerical semantics rather than normalizing the difference away.\n", example, base_trials.len() - same_digest_trials));
