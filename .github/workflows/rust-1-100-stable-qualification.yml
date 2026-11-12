@@ -50,47 +50,75 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "rustc=$RUSTC_VERSION" >> "$GITHUB_OUTPUT"
           echo "cargo=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$RUSTC_VERSION" == "rustc 1.100.0 "* && "$CARGO_VERSION" == "cargo 1.100.0 "* ]]; then
-            echo "candidate=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "candidate=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Rust 1.100.0 is not yet the published stable channel; exact 1.100.0 candidate qualification is skipped."
+      - name: Attempt exact Rust 1.100.0 distribution installation independently of the stable alias
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOG="$RUNNER_TEMP/rust-1.100-install.log"
+          set +e
+          rustup toolchain install 1.100.0 --profile minimal --component rustfmt --component clippy > "$LOG" 2>&1
+          status=$?
+          set -e
+          cat "$LOG"
+          if [[ $status -ne 0 ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Exact Rust 1.100.0 installation is not currently available from the distribution server."
+            {
+              echo "## Rust 1.100.0 exact distribution"
+              echo
+              echo "Installation failed with exit status $status."
+              echo "Published stable alias reports: ${{ steps.stable.outputs.rustc }} / ${{ steps.stable.outputs.cargo }}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
-      - name: Install exact 1.100.0 stable distribution
-        if: steps.stable.outputs.candidate == 'true'
-        run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt --component clippy
+          RUSTC_VERSION="$(rustup run 1.100.0 rustc --version)"
+          CARGO_VERSION="$(rustup run 1.100.0 cargo --version)"
+          {
+            echo "## Exact Rust 1.100.0 distribution"
+            echo
+            echo "- $RUSTC_VERSION"
+            echo "- $CARGO_VERSION"
+            echo "- commit $GITHUB_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$RUSTC_VERSION" == "rustc 1.100.0 "* && "$CARGO_VERSION" == "cargo 1.100.0 "* ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error::The installed rustc/Cargo version does not exactly identify as 1.100.0."
+          fi
       - name: Fetch existing lockfile under 14-day publication cooldown
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         env:
           CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE: 14 days
           CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE: deny
         run: cargo +1.100.0 fetch --locked --config config/cargo-1.100-canary.toml
       - name: Locked workspace metadata
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: cargo +1.100.0 metadata --locked --format-version 1 --no-deps --config config/cargo-1.100-canary.toml > /dev/null
       - name: Compile all targets
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: cargo +1.100.0 check --locked --all-targets --config config/cargo-1.100-canary.toml
       - name: Run all targets
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: cargo +1.100.0 test --locked --all-targets --config config/cargo-1.100-canary.toml
       - name: Run Clippy
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: cargo +1.100.0 clippy --locked --all-targets --config config/cargo-1.100-canary.toml
       - name: Build rustdoc
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: cargo +1.100.0 doc --locked --no-deps --config config/cargo-1.100-canary.toml
       - name: Verify raw x86_64 C ABI bool return register
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: bash scripts/test-rust-ffi-bool.sh 1.100.0 1.100.0
       - name: Exercise Cargo-native unused dependency lint
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: bash scripts/test-cargo-1.100-lints.sh 1.100.0 1.100.0
       - name: Capture compiler artifacts through Cargo JSON messages
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         run: bash scripts/capture-cargo-artifacts.sh 1.100.0 "$RUNNER_TEMP/cargo-artifact-manifest"
       - name: Enforce Cargo.lock immutability
-        if: steps.stable.outputs.candidate == 'true'
+        if: steps.candidate.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -98,14 +126,14 @@ jobs:
           test -z "$(git status --porcelain -- Cargo.lock)"
           echo "Cargo.lock unchanged." >> "$GITHUB_STEP_SUMMARY"
       - name: Record release-not-yet-available status
-        if: steps.stable.outputs.candidate != 'true'
+        if: steps.candidate.outputs.ready != 'true'
         run: |
           {
-            echo "## Rust 1.100.0 stable gate: NOT YET AVAILABLE"
+            echo "## Rust 1.100.0 exact distribution: NOT AVAILABLE"
             echo
-            echo "Published stable was: ${{ steps.stable.outputs.rustc }}"
-            echo "Published Cargo was: ${{ steps.stable.outputs.cargo }}"
-            echo "No candidate tests were claimed."
+            echo "Published stable alias: ${{ steps.stable.outputs.rustc }} / ${{ steps.stable.outputs.cargo }}"
+            echo "The exact version install failed or returned mismatched compiler/Cargo identity."
+            echo "No 1.100.0 candidate tests were claimed."
           } >> "$GITHUB_STEP_SUMMARY"
 
   rust-1-101-beta:
