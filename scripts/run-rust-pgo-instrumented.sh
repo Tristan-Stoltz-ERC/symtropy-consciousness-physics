@@ -48,6 +48,14 @@ done
 
 LOCK_BEFORE="$(sha256sum Cargo.lock | awk '{print $1}')"
 SOURCE_COMMIT="$(git rev-parse HEAD)"
+SOURCE_TREE="$(git rev-parse 'HEAD^{tree}')"
+KERNEL="$(uname -srmo)"
+CPU_MODEL="$(lscpu 2>/dev/null | grep -m1 'Model name:' | sed 's/^[^:]*:[[:space:]]*//' || echo unavailable)"
+CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo unknown)"
+MEMORY_TOTAL="$(grep -m1 '^MemTotal:' /proc/meminfo 2>/dev/null || echo unavailable)"
+FILESYSTEM="$(stat -f -c %T "$PWD" 2>/dev/null || echo unknown)"
+MOUNT_INFO="$(findmnt -no SOURCE,FSTYPE,OPTIONS -T "$PWD" 2>/dev/null || echo unavailable)"
+CPU_GOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo unavailable)"
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT="$RESULT_ROOT/$SOURCE_COMMIT-$TOOLCHAIN-$RUN_ID"
 PROFILE_DIR="$OUT/profile-data"
@@ -61,6 +69,7 @@ export CARGO_NET_OFFLINE=true
 export CARGO_TERM_COLOR=never
 rustup run "$TOOLCHAIN" cargo fetch --locked
 rustup run "$TOOLCHAIN" cargo metadata --locked --format-version 1 --no-deps > "$OUT/metadata/cargo-metadata.json"
+CARGO_METADATA_SHA="$(sha256sum "$OUT/metadata/cargo-metadata.json" | awk '{print $1}')"
 
 declare -A BASE_BUILD_MS BASE_BUILD_RSS BASE_BINARY BASE_BYTES
 declare -A PGO_BUILD_MS PGO_BUILD_RSS PGO_BINARY PGO_BYTES
@@ -132,7 +141,7 @@ run_example() {
 
 printf 'toolchain,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes,runtime_repeat,runtime_ms,stdout_sha256\n' > "$OUT/metadata/runtime.csv"
 printf 'variant,trial,example,runtime_repeat,stdout_sha256,stderr_sha256\n' > "$OUT/metadata/output-digests.csv"
-printf 'variant,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes\n' > "$OUT/metadata/builds.csv"
+printf 'variant,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes,binary_sha256\n' > "$OUT/metadata/builds.csv"
 printf 'variant,training_run,example,stdout_sha256,stderr_sha256\n' > "$OUT/metadata/training-digests.csv"
 
 # Profile training build. Profile-generation flags are not applied to build scripts
@@ -162,6 +171,7 @@ LLVM_PROFDATA="$(find "$SYSROOT/lib/rustlib" -type f -name llvm-profdata -perm -
 [[ -x "$LLVM_PROFDATA" ]] || die "llvm-profdata not found in llvm-tools-preview"
 "$LLVM_PROFDATA" merge --failure-mode=any -o "$PROFILE_DIR/merged.profdata" "${PROFRAW_FILES[@]}"
 [[ -s "$PROFILE_DIR/merged.profdata" ]] || die "merged profile is empty"
+LLVM_PROFDATA_VERSION="$("$LLVM_PROFDATA" --version 2>&1 | head -n1)"
 "$LLVM_PROFDATA" show --all-functions "$PROFILE_DIR/merged.profdata" > "$OUT/metadata/profile-summary.txt"
 
 # Repeated paired fresh builds. Both variants use line-tables-only debuginfo;
@@ -184,13 +194,15 @@ for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
     PGO_BIN="$pgo_dir/$TARGET/release/examples/$example"
     [[ -x "$BASE_BIN" && -x "$PGO_BIN" ]] || die "paired executable missing"
     BASE_BINARY["$trial:$example"]="$(stat -c %s "$BASE_BIN")"
+    BASE_BINARY_SHA["$trial:$example"]="$(sha256sum "$BASE_BIN" | awk '{print $1}')"
     BASE_BYTES["$trial:$example"]="$(du -sb "$base_dir" | awk '{print $1}')"
     PGO_BINARY["$trial:$example"]="$(stat -c %s "$PGO_BIN")"
+    PGO_BINARY_SHA["$trial:$example"]="$(sha256sum "$PGO_BIN" | awk '{print $1}')"
     PGO_BYTES["$trial:$example"]="$(du -sb "$pgo_dir" | awk '{print $1}')"
     BASE_BUILD_MS["$trial:$example"]="$BASE_BUILD_MS"; BASE_BUILD_RSS["$trial:$example"]="$BASE_BUILD_RSS"
     PGO_BUILD_MS["$trial:$example"]="$PGO_BUILD_MS"; PGO_BUILD_RSS["$trial:$example"]="$PGO_BUILD_RSS"
-    printf 'no-pgo,%s,%s,%s,%s,%s,%s\n' "$trial" "$example" "$BASE_BUILD_MS" "$BASE_BUILD_RSS" "${BASE_BYTES[$trial:$example]}" "${BASE_BINARY[$trial:$example]}" >> "$OUT/metadata/builds.csv"
-    printf 'instrumentation-pgo,%s,%s,%s,%s,%s,%s\n' "$trial" "$example" "$PGO_BUILD_MS" "$PGO_BUILD_RSS" "${PGO_BYTES[$trial:$example]}" "${PGO_BINARY[$trial:$example]}" >> "$OUT/metadata/builds.csv"
+    printf 'no-pgo,%s,%s,%s,%s,%s,%s,%s\n' "$trial" "$example" "$BASE_BUILD_MS" "$BASE_BUILD_RSS" "${BASE_BYTES[$trial:$example]}" "${BASE_BINARY[$trial:$example]}" "${BASE_BINARY_SHA[$trial:$example]}" >> "$OUT/metadata/builds.csv"
+    printf 'instrumentation-pgo,%s,%s,%s,%s,%s,%s,%s\n' "$trial" "$example" "$PGO_BUILD_MS" "$PGO_BUILD_RSS" "${PGO_BYTES[$trial:$example]}" "${PGO_BINARY[$trial:$example]}" "${PGO_BINARY_SHA[$trial:$example]}" >> "$OUT/metadata/builds.csv"
   done
 done
 
@@ -233,15 +245,33 @@ done
 
 LOCK_AFTER="$(sha256sum Cargo.lock | awk '{print $1}')"
 [[ "$LOCK_BEFORE" == "$LOCK_AFTER" ]] || die "Cargo.lock changed despite --locked"
+
+RUSTC_TOOLCHAIN="$TOOLCHAIN" bash scripts/analyze-rust-toolchain-benchmark.sh \
+  "$OUT/metadata/runtime.csv" no-pgo instrumentation-pgo \
+  > "$OUT/metadata/paired-analysis.md"
+
 {
-  echo "schema=luminous.rust-pgo-instrumentation.v0.2"
+  echo "schema=luminous.rust-pgo-instrumentation.v0.3"
   echo "source_commit=$SOURCE_COMMIT"
+  echo "source_tree=$SOURCE_TREE"
   echo "cargo_lock_sha256=$LOCK_BEFORE"
+  echo "cargo_lock_sha256_after=$LOCK_AFTER"
+  echo "cargo_metadata_sha256=$CARGO_METADATA_SHA"
+  echo "kernel=$KERNEL"
+  echo "cpu_model=$CPU_MODEL"
+  echo "cpu_count=$CPU_COUNT"
+  echo "memory_total=$MEMORY_TOTAL"
+  echo "filesystem=$FILESYSTEM"
+  echo "mount_info=$MOUNT_INFO"
+  echo "cpu_governor=$CPU_GOVERNOR"
   echo "toolchain=$TOOLCHAIN"
   echo "rustc=$RUSTC_VERSION"
   echo "cargo=$CARGO_VERSION"
   echo "llvm=$LLVM_VERSION"
+  echo "llvm_profdata=$LLVM_PROFDATA_VERSION"
   echo "target=$TARGET"
+  echo "profile_generate_flags=-Cprofile-generate=<profile-dir> -Cdebuginfo=line-tables-only"
+  echo "profile_use_flags=-Cdebuginfo=line-tables-only -Cprofile-use=<merged.profdata> -Cllvm-args=-pgo-warn-missing-function"
   echo "training_example=$TRAIN_EXAMPLE"
   echo "validation_examples=${VALIDATION_EXAMPLES[*]}"
   echo "build_repeats=$BUILD_REPEATS"
@@ -256,5 +286,6 @@ LOCK_AFTER="$(sha256sum Cargo.lock | awk '{print $1}')"
   echo "performance_claim=NOT_ESTABLISHED_BY_THIS_SCRIPT"
 } > "$OUT/metadata/run-manifest.txt"
 printf 'PASS_MECHANICAL_PROFILE_AND_OUTPUT_CHECKS\n' > "$OUT/STATUS.txt"
+bash scripts/seal-rust-pgo-evidence.sh "$OUT" metadata/run-manifest.txt
 printf 'results=%s\n' "$OUT"
 printf 'RUSTC_TOOLCHAIN=%s bash scripts/analyze-rust-toolchain-benchmark.sh %s/metadata/runtime.csv no-pgo instrumentation-pgo\n' "$TOOLCHAIN" "$OUT"
