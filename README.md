@@ -89,3 +89,8 @@ Stoltz, T. (2026). Social Structure Without Social Mechanisms:
 By-Product Mutualism in Energy-Constrained Multi-Agent Systems.
 Luminous Dynamics. https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physics
 ```
+
+
+## Archived research
+
+- [HDC-vs-scalar cooperation source](research/archived-examples/hdc_cooperation.rs) — preserved but not executable or scientifically qualified. See [the restoration contract](docs/research/ARCHIVED_HDC_COOPERATION_EXPERIMENT.md).

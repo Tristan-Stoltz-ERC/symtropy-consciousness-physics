@@ -1,3 +1,17 @@
+// ARCHIVED RESEARCH SOURCE — NOT A RUNNABLE EXPERIMENT
+//
+// Preserved verbatim from examples/hdc_cooperation.rs when that target was
+// removed from Cargo's executable example surface on 2026-11-13.
+//
+// The source references HdcConsciousnessContext / hdc_context APIs and a
+// consciousness-hdc feature that are not present in this repository. No HDC
+// implementation, HDC dependency, seed protocol, output, or result is
+// supplied by this archive. Do not describe this file as a completed or
+// reproduced HDC-vs-scalar experiment.
+//
+// See docs/research/ARCHIVED_HDC_COOPERATION_EXPERIMENT.md for the repair
+// contract and the evidence required before executable status is restored.
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! HDC vs Scalar cooperation experiment.
