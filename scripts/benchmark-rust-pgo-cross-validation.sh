@@ -171,10 +171,22 @@ for heldout in "${EXAMPLES[@]}"; do
     measure_build instrumented "$fold" "$example" "$profile_target" "-Cprofile-generate=$profile_dir"
   done
   for example in "${train[@]}"; do
+    TRAIN_STDOUT="$OUT/instrumented/$fold-$example.stdout"
+    TRAIN_STDERR="$OUT/instrumented/$fold-$example.stderr"
+    set +e
     LLVM_PROFILE_FILE="$profile_dir/%m_%p.profraw" \
       "$profile_target/release/examples/$example" \
-      > "$OUT/instrumented/$fold-$example.stdout" \
-      2> "$OUT/instrumented/$fold-$example.stderr"
+      > "$TRAIN_STDOUT" 2> "$TRAIN_STDERR"
+    status=$?
+    set -e
+    if (( status != 0 )); then
+      echo "PGO profile-training workload failed: fold=$fold example=$example status=$status" >&2
+      echo "--- workload stderr ---" >&2
+      tail -n 160 "$TRAIN_STDERR" >&2 || true
+      echo "--- workload stdout ---" >&2
+      tail -n 80 "$TRAIN_STDOUT" >&2 || true
+      exit "$status"
+    fi
   done
 
   shopt -s nullglob
@@ -182,8 +194,20 @@ for heldout in "${EXAMPLES[@]}"; do
   shopt -u nullglob
   [[ "${#raw_profiles[@]}" -gt 0 ]] || die "no raw profiles generated for $fold"
   profdata="$OUT/profiles/$fold.profdata"
-  "$LLVM_PROFDATA" merge -o "$profdata" "${raw_profiles[@]}"
-  "$LLVM_PROFDATA" show --counts "$profdata" > "$OUT/profiles/$fold-profile-summary.txt"
+  if ! "$LLVM_PROFDATA" merge -o "$profdata" "${raw_profiles[@]}" \
+      > "$OUT/profiles/$fold-merge.stdout" \
+      2> "$OUT/profiles/$fold-merge.stderr"; then
+    echo "llvm-profdata merge failed for $fold" >&2
+    tail -n 160 "$OUT/profiles/$fold-merge.stderr" >&2 || true
+    exit 1
+  fi
+  if ! "$LLVM_PROFDATA" show --counts "$profdata" \
+      > "$OUT/profiles/$fold-profile-summary.txt" \
+      2> "$OUT/profiles/$fold-show.stderr"; then
+    echo "llvm-profdata show failed for $fold" >&2
+    tail -n 160 "$OUT/profiles/$fold-show.stderr" >&2 || true
+    exit 1
+  fi
 
   measure_build pgo "$fold" "$heldout" "$pgo_target" \
     "-Cprofile-use=$profdata -Cllvm-args=-pgo-warn-missing-function"
