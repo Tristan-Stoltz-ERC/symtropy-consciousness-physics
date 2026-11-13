@@ -161,3 +161,9 @@ Promote only after:
 6. a separate reviewed change proposes updating the default pin.
 
 No performance superiority or repository-wide compatibility claim is made by the presence of this workflow.
+
+## Curvature example feature boundary
+
+The three curvature examples consume APIs compiled only with `consciousness-curvature`. Their run instructions already required the feature, but target metadata initially declared it only for `curvature_selforg`. Cargo now declares `required-features = ["consciousness-curvature"]` for `curvature_lensing`, `curvature_selforg` and `curvature_cooperation`.
+
+The dedicated CI matrix checks both directions with Rust 1.99.1 and 1.100.0: each target must be rejected by Cargo when the feature is absent, and all three must compile when the feature is explicitly enabled. This corrects target metadata; it does not change the geometry model or claim its physical interpretation is experimentally validated.
