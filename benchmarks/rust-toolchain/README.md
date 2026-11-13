@@ -1,6 +1,8 @@
-# Paired Rust toolchain benchmark v0.5
+# Paired Rust toolchain benchmark v0.6
 
-Compares exact Rust/Cargo 1.99.1 and 1.100.0 on the same clean source revision and unchanged Cargo.lock. Rust 1.100.0 has a scheduled stable date of 2026-11-12, but at the latest hosted observation its release-notes tracker was still a draft and exact installation returned HTTP 404. Do not run or label a 1.100.0 performance comparison until the exact distribution is available.
+Compares exact Rust/Cargo 1.99.1 and 1.100.0 on the same clean source revision and unchanged Cargo.lock. Rust 1.100.0 was officially released on 2026-11-12; the new qualification workflow now targets the exact stable distribution, not a scheduled release date or mutable beta alias.
+
+Run locally after installing both exact toolchains:
 
 ```sh
 rustup toolchain install 1.99.1 --profile minimal
@@ -9,11 +11,23 @@ BUILD_REPEATS=5 RUNTIME_REPEATS=5 \
   bash scripts/benchmark-rust-1.99.1-vs-1.100.0.sh
 ```
 
-The wrapper refuses to run unless both `rustc` and Cargo identify as exactly 1.100.0 for the candidate. It does not follow moving `stable` or `beta` aliases during measurements.
+The exact wrapper refuses to run unless Rust/Cargo 1.100.0 are installed and identified exactly.
+
+## Automated paired benchmark
+
+The opt-in workflow is `.github/workflows/rust-1-99-1-vs-1-100-0-performance.yml`. It is triggered by changes to the benchmark harness on a pull request or manual dispatch. It:
+- installs exact Rust/Cargo 1.99.1 and 1.100.0;
+- performs five paired build trials for each fixed simulation example;
+- uses fresh target directories, offline/locked compilation and a warmed Cargo registry;
+- rotates toolchain order between trials;
+- measures compile time, peak RSS when available, target bytes, executable bytes and runtime;
+- retains stdout/stderr and compiler output digests;
+- runs the dependency-free Rust analysis tool;
+- uploads metadata, logs, raw CSV and analysis as a 30-day artifact.
 
 ## Controls and evidence
 
-- Clean worktree; exact Git commit recorded.
+- Clean worktree and exact Git commit.
 - Cargo.lock SHA-256 before and after.
 - Full `rustc -Vv` and `cargo -Vv` for both compiler versions.
 - Cargo registry warmed before measurements; measured commands run offline and with `--locked`.
@@ -21,60 +35,45 @@ The wrapper refuses to run unless both `rustc` and Cargo identify as exactly 1.1
 - Incremental compilation disabled for the primary compiler comparison.
 - `RUSTC_WRAPPER` and `RUSTC_WORKSPACE_WRAPPER` unset; sccache measured separately.
 - Rotating toolchain order across trials.
-- Compile wall time, peak RSS where GNU time is available, target directory size, executable size, simulation runtime and stdout SHA-256.
 - Kernel, CPU, memory, filesystem/mount and CPU governor recorded.
 
-The page cache is not dropped. Results are fresh-target / warmed-registry, not cold-machine or cold-disk. If GNU time is missing, RSS is NA and is not fabricated.
+The page cache is not dropped. Results are **fresh-target / warmed-registry**, not cold-machine or cold-disk. Missing GNU time leaves RSS as NA; it is not fabricated.
 
 ## Reproducible analysis
 
 The raw CSV is analyzed by a dependency-free Rust program:
 
 ```sh
-RUSTC_TOOLCHAIN=1.99.1 bash scripts/analyze-rust-toolchain-benchmark.sh \
+RUSTC_TOOLCHAIN=1.100.0 bash scripts/analyze-rust-toolchain-benchmark.sh \
   benchmark-results/rust-toolchain/run-<id>/results/measurements.csv \
   1.99.1 1.100.0
 ```
 
-The analyzer:
-- pairs baseline and candidate by exact trial number and example;
-- de-duplicates build metrics repeated on each runtime row;
-- checks that runtime repeat numbers are contiguous;
-- rejects inconsistent build metadata or within-trial output-digest instability;
-- summarizes per-trial runtime medians, median absolute deviation and paired speedup ratios;
-- computes a deterministic bootstrap interval for the median paired runtime speedup;
-- reports RSS, target-directory and executable-size comparisons;
-- reports p99 only when both conditions have at least 10,000 runtime observations.
+The analyzer pairs baseline and candidate by exact trial/example key, de-duplicates build-level metrics, verifies contiguous runtime repeats, rejects inconsistent build metadata or digest instability, and calculates medians, MAD and paired speedup estimates with a deterministic bootstrap interval. p99 is withheld until both versions have at least 10,000 observations for that workload.
 
-Its self-test runs in the hosted 1.101.0-beta.1 smoke lane and checks known speedup ratios, digest stability, malformed-digest rejection and the small-sample p99 guard. The analyzer does not add a Cargo dependency or modify Cargo.lock.
+## Workloads and comparison
 
-## Workloads
-
+The initial corpus uses:
 - `gradient_replacement`
 - `cooperation_decomposition`
 - `jphi_convergence`
 
-These existing examples represent different parts of the thermodynamic multi-agent simulation. Do not change experiment seeds, model parameters, or scientific source while comparing compilers.
+These represent distinct parts of the thermodynamic multi-agent simulation. They are application-specific workloads, not substitutes for compiler-wide benchmark corpora.
 
-## Compiler ecosystem comparison
+Use upstream `rustc-perf` for compiler-wide comparison and Cargo `--timings` to distinguish compiler work from build graph, build scripts, proc macros and linking. Keep compiler build time and application runtime separate. Measure sccache independently from the no-cache build profile.
 
-Use upstream `rustc-perf` for compiler-wide fresh and incremental build workloads. Its hosted performance service compares compiler revisions across popular crates; the published tracking scope is currently x86_64 Linux. This project-specific corpus does not replace rustc-perf.
+## Next frontier: PGO
 
-Use Cargo `--timings` to identify dependency graph, build-script and critical-path bottlenecks. Keep compilation, tests, docs and simulation runtime as distinct metrics. Measure sccache hit/miss as a separate profile.
+Rust 1.100 stabilizes `-Cprofile-sample-use`. The PGO experiment should compare non-PGO, instrumentation-PGO and sample-PGO on a frozen training corpus and held-out validation scenarios. Bind every profile to its source/compiler/flags/target digests. Reject PGO configurations that overfit the training corpus or change scientific outcomes. See the qualification report for the full protocol.
 
-## Interpretation
+## Statistical interpretation
 
-Compare paired distributions rather than best-of-run. Report median, IQR and confidence intervals. Preserve all raw stdout/stderr. Compare outputs within each toolchain for repeatability and across toolchains for numerical drift. A digest mismatch requires an explanation; do not silently normalize it.
-
-Five runs are exploratory. No p99 claim is justified from five observations. Use 30+ independent paired runs for ordinary latency distribution claims and at least 10,000 observations per condition (or a justified design) for p99. No performance advantage is claimed before a completed matched campaign.
+Five paired trials are exploratory only. Use 30+ independent paired runs for ordinary latency-distribution claims and 10,000+ observations per condition for p99. Keep failed/skipped runs visible. Do not infer a compiler improvement from one best run or from a faster compilation alone.
 
 ## References
 
-- Rust Forge release schedule: https://forge.rust-lang.org/
-- Rust 1.100 draft release-notes tracker: https://github.com/rust-lang/rust/issues/163811
-- Official Rust release announcements: https://blog.rust-lang.org/releases/
+- Rust 1.100.0 release announcement: https://blog.rust-lang.org/2026/11/12/Rust-1.100.0/
 - Rust compiler performance testing: https://rustc-dev-guide.rust-lang.org/tests/perf.html
-- rustc-perf profiling: https://rustc-dev-guide.rust-lang.org/profiling/with-rustc-perf.html
-- Cargo build timings: https://doc.rust-lang.org/stable/cargo/reference/timings.html
-- Cargo build performance: https://doc.rust-lang.org/cargo/guide/build-performance.html
-- sccache Rust caching constraints: https://github.com/mozilla/sccache/blob/main/docs/Rust.md
+- Rust PGO guide: https://doc.rust-lang.org/rustc/profile-guided-optimization.html
+- Cargo build timings: https://doc.rust-lang.org/cargo/reference/timings.html
+- Criterion.rs: https://bheisler.github.io/criterion.rs/book/
