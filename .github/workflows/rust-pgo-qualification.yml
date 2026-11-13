@@ -21,8 +21,14 @@ on:
         options: [jphi_convergence, gradient_replacement, cooperation_decomposition]
         default: jphi_convergence
         required: true
+      build_repeats:
+        description: Independent fresh-target paired build trials
+        type: choice
+        options: ["5", "10", "30"]
+        default: "5"
+        required: true
       repeats:
-        description: Matched runtime repetitions
+        description: Matched runtime repetitions within each build trial
         type: choice
         options: ["5", "10", "30"]
         default: "5"
@@ -78,6 +84,7 @@ jobs:
         env:
           RUST_TOOLCHAIN: 1.100.0
           PGO_TRAIN_EXAMPLE: ${{ inputs.train_example }}
+          PGO_BUILD_REPEATS: ${{ inputs.build_repeats }}
           PGO_RUN_REPEATS: ${{ inputs.repeats }}
           PGO_RESULT_ROOT: ${{ runner.temp }}/symtropy-pgo
         run: |
@@ -122,6 +129,7 @@ jobs:
         env:
           RUST_TOOLCHAIN: 1.100.0
           PGO_SAMPLE_EXAMPLE: ${{ inputs.train_example }}
+          PGO_BUILD_REPEATS: ${{ inputs.build_repeats }}
           PGO_RUN_REPEATS: ${{ inputs.repeats }}
           PGO_RESULT_ROOT: ${{ runner.temp }}/symtropy-sample-pgo
         run: |
@@ -136,6 +144,15 @@ jobs:
           fi
           if [[ $status -ne 0 ]]; then exit "$status"; fi
           echo "result=MECHANICAL_CHECKS_PASS" >> "$GITHUB_OUTPUT"
+      - name: Analyze sample-PGO paired results
+        if: steps.sample.outputs.result == 'MECHANICAL_CHECKS_PASS'
+        env:
+          RUSTC_TOOLCHAIN: 1.100.0
+        run: |
+          set -euo pipefail
+          CSV="$(find "${{ runner.temp }}/symtropy-sample-pgo" -name runtime.csv -print -quit)"
+          test -n "$CSV"
+          bash scripts/analyze-rust-toolchain-benchmark.sh "$CSV" no-pgo sample-pgo
       - name: Upload sample-PGO raw evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
