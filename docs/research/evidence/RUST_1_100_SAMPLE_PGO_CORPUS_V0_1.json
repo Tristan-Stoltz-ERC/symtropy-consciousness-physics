@@ -1,0 +1,97 @@
+{
+  "schema": "luminous.rust-toolchain-pgo-corpus.v0.1",
+  "status": "protocol_only_not_yet_executed",
+  "profile_mode": "sample-based",
+  "toolchain": {
+    "rustc": "1.100.0",
+    "cargo": "1.100.0",
+    "host_target": "x86_64-unknown-linux-gnu",
+    "release_profile": true,
+    "flags": [
+      "-Cdebuginfo=line-tables-only",
+      "-Cprofile-sample-use=<absolute-path>",
+      "-Cllvm-args=-pgo-warn-missing-function"
+    ]
+  },
+  "training": [
+    {
+      "example": "gradient_replacement",
+      "source_path": "examples/gradient_replacement.rs",
+      "git_blob_sha1": "61d0534981873975f2cb294394d6cd7cbc15dcf6",
+      "agents": 20,
+      "controllers_or_conditions": 6,
+      "ticks_per_run": 8000,
+      "seed": {
+        "formula": "42 + 997*s",
+        "s_start_inclusive": 0,
+        "s_end_exclusive": 20,
+        "count": 20
+      },
+      "profile_use": "training_only"
+    }
+  ],
+  "held_out": [
+    {
+      "example": "cooperation_decomposition",
+      "source_path": "examples/cooperation_decomposition.rs",
+      "git_blob_sha1": "179a47f2a04f0e19c0747f7839ba18d8bcf41520",
+      "agents": 20,
+      "controllers_or_conditions": 6,
+      "ticks_per_run": 8000,
+      "seed": {
+        "formula": "42 + 997*s",
+        "s_start_inclusive": 0,
+        "s_end_exclusive": 20,
+        "count": 20
+      }
+    },
+    {
+      "example": "jphi_convergence",
+      "source_path": "examples/jphi_convergence.rs",
+      "git_blob_sha1": "7c084b797591ca616637cf295cc029a28b5f0633",
+      "agents": 12,
+      "controllers_or_conditions": 3,
+      "ticks_per_run_max": 10000,
+      "seed": {
+        "formula": "42 + 997*s",
+        "s_start_inclusive": 0,
+        "s_end_exclusive": 10,
+        "count": 10
+      },
+      "statistical_comparison_rerun": true
+    }
+  ],
+  "required_receipt_fields": [
+    "git_commit",
+    "git_tree",
+    "rustc_version_verbose",
+    "cargo_version_verbose",
+    "target_triple",
+    "rustflags",
+    "cpu_model",
+    "kernel",
+    "perf_version",
+    "perf_event",
+    "perf_branch_stack_enabled",
+    "training_binary_sha256",
+    "perf_data_sha256",
+    "sample_profile_sha256",
+    "profile_format",
+    "training_corpus_digest",
+    "held_out_corpus_digest",
+    "baseline_binary_sha256_by_example",
+    "pgo_binary_sha256_by_example",
+    "baseline_stdout_sha256_by_example",
+    "pgo_stdout_sha256_by_example"
+  ],
+  "claim_ceiling": {
+    "passing_pgo": "measured sample-PGO benefit on these exact two held-out application workloads only",
+    "not_established": [
+      "general Rust compiler superiority",
+      "full Symtropy workspace qualification",
+      "other CPUs or operating systems",
+      "generalization to unseen simulation families",
+      "scientific validity of the experiment models"
+    ]
+  }
+}
