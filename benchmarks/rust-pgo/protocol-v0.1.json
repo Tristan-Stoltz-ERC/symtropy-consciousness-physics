@@ -1,0 +1,62 @@
+{
+  "schema": "luminous.rust-pgo-evidence-passport.v0.1",
+  "status": "research_protocol_not_yet_qualified",
+  "toolchain": {
+    "rustc": "1.100.0",
+    "cargo": "1.100.0",
+    "llvm_major_must_match": true
+  },
+  "methods": [
+    {
+      "id": "instrumentation-pgo",
+      "generate_flag": "-Cprofile-generate",
+      "consume_flag": "-Cprofile-use",
+      "converter": "llvm-profdata",
+      "training_example": "jphi_convergence",
+      "transfer_probes": [
+        "gradient_replacement",
+        "cooperation_decomposition"
+      ]
+    },
+    {
+      "id": "sample-pgo",
+      "generate_method": "perf branch-stack sampling + llvm-profgen",
+      "consume_flag": "-Cprofile-sample-use",
+      "training_example": "jphi_convergence",
+      "platform": "x86_64-unknown-linux-gnu",
+      "pmu_required": true
+    }
+  ],
+  "immutable_bindings": [
+    "git_commit",
+    "git_tree",
+    "Cargo.lock sha256",
+    "rustc -Vv",
+    "cargo -Vv",
+    "LLVM version",
+    "target triple",
+    "RUSTFLAGS",
+    "Cargo features",
+    "training workload identifiers",
+    "experiment seed schedule",
+    "profile sha256"
+  ],
+  "proposed_acceptance": {
+    "median_runtime_improvement_training_min_percent": 5,
+    "median_runtime_improvement_transfer_min_percent": 3,
+    "max_critical_workload_regression_percent": 2,
+    "max_binary_size_growth_percent": 5,
+    "max_peak_rss_growth_percent": 5,
+    "paired_runs_exploratory_min": 5,
+    "paired_runs_claim_min": 30,
+    "p99_observations_per_condition_min": 10000,
+    "exact_stdout_equivalence_required": true,
+    "no_scientific_inputs_may_change": true
+  },
+  "claim_ceiling": [
+    "PASS_MECHANICAL_PROFILE_AND_OUTPUT_CHECKS does not establish a speedup",
+    "cross-example transfer is not an IID held-out split",
+    "PMU unavailability is NOT_EVALUABLE, not PASS or FAIL for compiler compatibility",
+    "sample and instrumentation profiles are not interchangeable"
+  ]
+}
