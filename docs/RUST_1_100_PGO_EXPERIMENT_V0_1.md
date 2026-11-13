@@ -40,9 +40,13 @@ The corpus uses three existing, deterministic examples, each with a source blob 
 - 10 deterministic seeds: `42 + 997*s`, `s = 0..9`;
 - includes its existing second statistical comparison pass.
 
-Neither held-out executable may be run while collecting the sample profile. The experiment therefore tests profile generalization from one simulation program to two different simulation programs and code paths. It is a **cross-workload holdout**, not a claim of independent seed populations: the programs use the same deterministic seed formula.
+Neither held-out executable may be run while collecting the training profile. However, these are three separately linked executables. A sample profile generated from `gradient_replacement` is **not automatically valid** for `cooperation_decomposition` or `jphi_convergence`: profile function identities, code coverage and missing-function behavior must be checked for each consuming binary.
 
-No source file or simulation input is changed to produce this split.
+Accordingly, the current three-program split is an **exploratory cross-binary transfer experiment**, not yet a valid held-out generalization benchmark. It cannot support a PGO promotion decision unless profile compatibility is demonstrated for the consuming executable and profile coverage is disclosed. A profile with missing or mismatched hot functions is a rejected transfer, not a neutral or passing result.
+
+The primary PGO benchmark should instead use one stable benchmark executable with an explicit workload/seed selector. Training and validation seed ranges must be disjoint, the same executable/source/target/flags must be used for profile generation and profile consumption, and the held-out seed range must never be run during profile collection. The existing examples do not currently expose that common driver or disjoint seed selection. Implementing it is a separate benchmark-harness increment; do not silently edit the scientific examples as part of this protocol.
+
+No source file or simulation input is changed by this protocol-only document.
 
 ## Protocol
 
@@ -53,10 +57,10 @@ No source file or simulation input is changed to produce this split.
    `perf record -b -e branches:u`.
 5. Convert the collected `perf.data` to an LLVM sample profile with `llvm-profgen --binary=<training-binary> --output=<profile> --perfdata=<perf.data>`.
 6. Hash and preserve the raw `perf.data`, profile output, executable, source commit, binary build flags and profile receipt.
-7. Build the two held-out examples with `-Cprofile-sample-use=<absolute-profile-path>` and `-Cllvm-args=-pgo-warn-missing-function`. Keep the source, target, release flags, features and dependency lock unchanged.
-8. Build the same two held-out examples again without PGO under the same toolchain and environment.
+7. Build a PGO consumer only when its source, target triple and relevant compiler flags match the profile producer. For cross-binary transfers, inspect function/profile coverage and missing-function diagnostics before any performance comparison.
+8. Build the same consumer without PGO under the same toolchain and environment.
 9. Run baseline and PGO executables on the exact same deterministic inputs. Preserve stdout/stderr, hashes, runtime samples, peak RSS and binary sizes.
-10. Analyze the two held-out workloads separately. Do not tune the profile after inspecting held-out results and then call those results validation.
+10. Label cross-binary runs exploratory. Do not call them held-out generalization. A future shared-driver benchmark must freeze disjoint training and validation seed ranges and use one executable identity for training and profile consumption.
 
 Use absolute profile paths: Cargo can invoke rustc from different working directories. Pass an explicit target triple so profile flags do not leak into build scripts. The PGO experiment is release-only.
 
@@ -79,7 +83,9 @@ A denied `perf_event` permission, unavailable branch-stack hardware or missing p
 - PGO must not change experiment conclusion labels, condition ordering, seed coverage, convergence classification or any statistical result.
 - All existing unit/integration/supported-target tests remain required.
 - The PGO profile must bind exact source, compiler, Cargo, target, flags, training corpus, training binary, perf input and profile digest.
-- A profile generated from another compiler, source revision, target triple or set of compiler flags is rejected.
+- The primary promotion benchmark must generate and consume the profile with the same executable identity and disjoint training/validation seed ranges.
+- A profile generated from another compiler, source revision, target triple or incompatible codegen flags is rejected.
+- Cross-binary profile transfer must publish profile coverage and missing-function diagnostics and remains exploratory until a matched workload harness exists.
 
 ## Metrics and aspirational targets
 
@@ -91,7 +97,7 @@ Measure separately per held-out workload:
 - compile time and profile generation overhead;
 - exact output digest and domain metric deltas.
 
-Initial exploratory target: at least 5% median held-out runtime improvement on both held-out workloads, with no correctness change and no more than 5% binary-size increase. This is an aspiration, not a release gate until a baseline distribution and variance are established. No p99 claim from a small number of complete experiment executions; 10,000 observations per condition or a justified alternative are required for p99.
+Initial aspirational target for a future same-binary, disjoint-seed benchmark: at least 5% median validation runtime improvement with no correctness change and no more than 5% binary-size increase. The present cross-binary transfer lane has no promotion threshold and cannot qualify this target. No p99 claim from a small number of complete experiment executions; 10,000 observations per condition or a justified alternative are required for p99.
 
 If training performance improves but either held-out workload regresses, label it **overfit / no promotion**.
 
@@ -100,7 +106,9 @@ If training performance improves but either held-out workload regresses, label i
 The fair comparison has three levels:
 1. upstream `rustc-perf` for general compiler performance;
 2. Cargo `--timings` for dependency/build critical-path analysis;
-3. these frozen Symtropy workloads for application-specific PGO generalization.
+3. a future shared Symtropy benchmark driver with disjoint seed partitions for application-specific PGO generalization.
+
+The current cross-binary transfer is an exploratory diagnostic only; it is not evidence of generalization.
 
 We do not claim to outperform upstream rustc-perf using unrelated examples. PGO success means a measured gain on both held-out Symtropy workloads without semantic drift, not an industry-wide compiler result.
 
