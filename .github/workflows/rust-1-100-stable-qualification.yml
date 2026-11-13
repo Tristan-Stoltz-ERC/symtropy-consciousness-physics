@@ -217,9 +217,44 @@ jobs:
         env:
           RUSTC_TOOLCHAIN: 1.101.0-beta.1
         run: bash scripts/analyze-rust-toolchain-benchmark.sh --self-test
+      - name: Exercise Cargo publish-age resolver under beta
+        run: bash scripts/test-cargo-publish-age.sh 1.101.0-beta.1 1.101.0-beta.1
 
-  cargo-publish-age-negative-control:
-    name: Cargo publish-age deterministic negative controls (dated nightly)
+  rust-1-100-feature-smokes:
+    name: Rust 1.100.0 stable isolated Cargo, ABI and supply-chain smoke tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact Rust and Cargo stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal --component rustfmt
+          RUSTC_VERSION="$(rustup run 1.100.0 rustc --version)"
+          CARGO_VERSION="$(rustup run 1.100.0 cargo --version)"
+          [[ "$RUSTC_VERSION" == "rustc 1.100.0 "* ]]
+          [[ "$CARGO_VERSION" == "cargo 1.100.0 "* ]]
+          rustup run 1.100.0 rustc -Vv
+          rustup run 1.100.0 cargo -Vv
+      - name: Verify raw x86_64 C ABI bool return register
+        run: bash scripts/test-rust-ffi-bool.sh 1.100.0 1.100.0
+      - name: Exercise Cargo-native unused dependency lint
+        run: bash scripts/test-cargo-1.100-lints.sh 1.100.0 1.100.0
+      - name: Capture Cargo artifact manifest from isolated fixture
+        run: bash scripts/capture-cargo-artifacts.sh 1.100.0 "$RUNNER_TEMP/cargo-artifact-smokes" tests/toolchain/cargo-lints/Cargo.toml
+      - name: Compile and self-test dependency-free paired benchmark analyzer
+        env:
+          RUSTC_TOOLCHAIN: 1.100.0
+        run: bash scripts/analyze-rust-toolchain-benchmark.sh --self-test
+      - name: Exercise stable Cargo publish-age resolver controls
+        run: bash scripts/test-cargo-publish-age.sh 1.100.0 1.100.0
+
+  cargo-publish-age-beta-negative-control:
+    name: Cargo 1.101.0-beta.1 publish-age forward-compatibility
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     continue-on-error: true
@@ -228,15 +263,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Install exact dated nightly for the still-experimental Cargo feature
+      - name: Install exact beta Cargo
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install nightly-2026-11-11 --profile minimal
-          rustup run nightly-2026-11-11 rustc -Vv
-          rustup run nightly-2026-11-11 cargo -Vv
-      - name: Exercise old-version fallback, fresh-only rejection and lockfile exception
-        run: bash scripts/test-cargo-publish-age.sh nightly-2026-11-11
+          rustup toolchain install 1.101.0-beta.1 --profile minimal
+          rustup run 1.101.0-beta.1 rustc -Vv
+          rustup run 1.101.0-beta.1 cargo -Vv
+      - name: Exercise publish-age resolver controls without nightly feature flags
+        run: bash scripts/test-cargo-publish-age.sh 1.101.0-beta.1 1.101.0-beta.1
 
   curvature-example-feature-contract:
     name: Curvature example feature contract (stable and beta)
