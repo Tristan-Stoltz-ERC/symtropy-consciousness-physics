@@ -1,3 +1,12 @@
+// ARCHIVED RESEARCH SOURCE
+// Status: historical / non-executable in this repository snapshot.
+// Original Git blob SHA-1: 2464da8339ee1d8cf77e9806fce91f4832033493
+// The original source is preserved below this notice. It referenced an
+// unexported hdc_context API and an undeclared consciousness-hdc feature.
+// This file is intentionally outside Cargo's auto-discovered examples path.
+// Do not restore it to examples/ until the HDC context implementation,
+// feature contract, tests, and executable benchmark have been qualified.
+
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! HDC vs Scalar cooperation experiment.

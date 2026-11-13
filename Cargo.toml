@@ -18,3 +18,17 @@ consciousness-curvature = []
 
 [dev-dependencies]
 proptest = "1.4"
+
+# This experiment consumes the curvature API, which is deliberately compiled
+# only when the consciousness-curvature feature is enabled.
+[[example]]
+name = "curvature_selforg"
+path = "examples/curvature_selforg.rs"
+required-features = ["consciousness-curvature"]
+
+# The lensing experiment requires the feature-gated conformal metric and
+# HarmonyField::sigma_gradient API. Do not compile it in the default target set.
+[[example]]
+name = "curvature_lensing"
+path = "examples/curvature_lensing.rs"
+required-features = ["consciousness-curvature"]

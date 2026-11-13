@@ -1,0 +1,8 @@
+# Applied only by the opt-in Rust 1.100 canary workflow.
+# This file is deliberately not named config.toml and is not loaded by
+# existing developer or stable builds.
+[registry]
+global-min-publish-age = "14 days"
+
+[resolver]
+incompatible-publish-age = "deny"

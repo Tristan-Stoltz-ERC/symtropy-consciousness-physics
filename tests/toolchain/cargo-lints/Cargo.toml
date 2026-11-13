@@ -1,0 +1,11 @@
+[package]
+name = "cargo-lint-smoke"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+unused-fixture = { path = "unused-fixture" }
+
+[lints.cargo]
+unused_dependencies = "warn"
