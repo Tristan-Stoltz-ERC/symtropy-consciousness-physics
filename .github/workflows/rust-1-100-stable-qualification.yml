@@ -175,6 +175,8 @@ jobs:
         run: cargo +1.101.0-beta.1 doc --locked --no-deps --config config/cargo-1.100-canary.toml
       - name: Verify raw x86_64 C ABI bool return register
         run: bash scripts/test-rust-ffi-bool.sh 1.101.0-beta.1 1.101.0-beta.1
+      - name: Qualify stabilized never type across editions 2018, 2021 and 2024
+        run: bash scripts/test-rust-1.100-language.sh 1.101.0-beta.1 1.101.0-beta.1
       - name: Exercise Cargo-native unused dependency lint
         run: bash scripts/test-cargo-1.100-lints.sh 1.101.0-beta.1 1.101.0-beta.1
       - name: Capture compiler artifacts through Cargo JSON messages
@@ -242,6 +244,8 @@ jobs:
           rustup run 1.100.0 cargo -Vv
       - name: Verify raw x86_64 C ABI bool return register
         run: bash scripts/test-rust-ffi-bool.sh 1.100.0 1.100.0
+      - name: Qualify stabilized never type across editions 2018, 2021 and 2024
+        run: bash scripts/test-rust-1.100-language.sh 1.100.0 1.100.0
       - name: Exercise Cargo-native unused dependency lint
         run: bash scripts/test-cargo-1.100-lints.sh 1.100.0 1.100.0
       - name: Capture Cargo artifact manifest from isolated fixture
