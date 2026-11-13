@@ -85,13 +85,25 @@
     "pgo_stdout_sha256_by_example"
   ],
   "claim_ceiling": {
-    "passing_pgo": "measured sample-PGO benefit on these exact two held-out application workloads only",
+    "passing_pgo": "measured sample-PGO benefit on a same-binary, disjoint-seed validation benchmark; cross-binary transfer remains exploratory",
     "not_established": [
       "general Rust compiler superiority",
       "full Symtropy workspace qualification",
       "other CPUs or operating systems",
       "generalization to unseen simulation families",
-      "scientific validity of the experiment models"
+      "scientific validity of the experiment models",
+      "sample-profile transfer across separately linked example binaries without per-binary function coverage proof"
     ]
-  }
+  },
+  "primary_benchmark_status": "blocked_until_shared_driver_has_disjoint_seed_selection",
+  "cross_binary_transfer_status": "exploratory_only",
+  "cross_binary_transfer_warning": "Training and held-out workloads are separate executables. llvm-profgen sample profile compatibility and function coverage must be established per consuming binary; no generalization claim follows from executable labels alone.",
+  "required_same_binary_holdout_fields": [
+    "benchmark_driver_git_blob_sha1",
+    "training_seed_ranges",
+    "validation_seed_ranges",
+    "same_executable_sha256_for_profile_generation_and_use",
+    "profile_function_coverage_by_consumer",
+    "missing_function_diagnostics"
+  ]
 }
