@@ -217,3 +217,43 @@ The paired 1.99.1 versus 1.100.0 application benchmark remains separate from com
 ### Promotion
 
 The repository default remains Rust 1.99.1 until the entire supported target surface and any candidate-only differences are resolved, with the matched performance and scientific-result evidence reviewed. Passing the 1.100.0 library and isolated feature suites is not equivalent to qualifying every example, target, Holochain guest, or runtime.
+
+
+## Latest exact-head supported-surface receipt — 2026-11-13
+
+The HDC archive and curvature feature metadata repairs are now validated on the current PR merge tree.
+
+Runs:
+- Stable and forward compatibility workflow: [#43428281524](https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physics/actions/runs/43428281524) — SUCCESS.
+- Archive/supported target matrix: [#43428281223](https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physics/actions/runs/43428281223) — SUCCESS.
+
+### Supported target/test surface
+
+- Rust 1.99.1: all supported targets compiled, tests passed, Cargo.lock unchanged.
+- Rust 1.100.0 stable: all supported targets compiled, tests passed, Cargo.lock unchanged.
+- Rust 1.101.0-beta.1: the independent forward-compatibility full-target job compiled all supported targets, ran tests, Clippy and rustdoc, and preserved Cargo.lock.
+
+Each supported target/test run reported:
+- 104 library tests passed;
+- 2 integration tests passed;
+- 7 additional target/test cases passed;
+- 113 total passed, 0 failed, 0 ignored in the non-zero test suites.
+
+### Curvature feature contract
+
+Both `curvature_selforg` and `curvature_lensing` now compile explicitly with `consciousness-curvature` enabled on:
+- Rust 1.99.1;
+- Rust 1.100.0;
+- Rust 1.101.0-beta.1.
+
+The fix was Cargo target metadata only: `curvature_lensing` now declares `required-features = ["consciousness-curvature"]`, matching the feature-gated module/method and the example's own run instructions. No scientific code or experiment inputs changed.
+
+### HDC disposition
+
+The original HDC source remains preserved outside Cargo's auto-discovered example path; the supported-surface workflow verified the archive files and then compiled the actual supported targets. It did not execute the archived HDC experiment or claim any HDC performance/collective-behavior result.
+
+Issue #3's HDC source/API acceptance is therefore satisfied by explicit archive disposition and successful supported-target builds. Restoring the experiment remains a separate research project requiring a genuine HDC context implementation and independent experiment validation.
+
+### Remaining performance evidence
+
+The paired 1.99.1 vs 1.100.0 application benchmark is still running at this observation. No winner or compiler-speedup claim is made yet. The current qualification workflow run is green, but this is not a complete repository-wide CI green badge: unrelated workflows are separately tracked and not represented by these toolchain results.
