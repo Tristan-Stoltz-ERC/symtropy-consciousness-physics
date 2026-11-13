@@ -13,7 +13,6 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 command -v rustup >/dev/null 2>&1 || die "rustup is required"
-command -v llvm-profdata >/dev/null 2>&1 || true
 [[ -x /usr/bin/time ]] || die "/usr/bin/time is required for peak-RSS measurements"
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] || die "worktree must be clean before PGO qualification"
 
@@ -39,7 +38,7 @@ rustup run "$TOOLCHAIN" cargo -Vv > "$OUT/toolchains/cargo.txt"
 "$LLVM_PROFDATA" --version > "$OUT/toolchains/llvm-profdata.txt"
 
 {
-  echo "schema=luminous.symtropy.instrumentation-pgo-cross-validation.v0.1"
+  echo "schema=luminous.symtropy.instrumentation-pgo-cross-validation.v0.2"
   echo "source_commit=$SOURCE_SHA"
   echo "cargo_lock_sha256=$LOCK_SHA"
   echo "rustc=$RUSTC_VERSION"
@@ -59,15 +58,17 @@ rustup run "$TOOLCHAIN" cargo -Vv > "$OUT/toolchains/cargo.txt"
   echo "sccache=disabled"
   echo "cargo_incremental=0"
   echo "dependency_resolution=locked"
+  echo "runtime_order=alternating baseline/pgo within each trial"
 } > "$OUT/metadata.txt"
 
 printf 'mode,fold,example,repeat,elapsed_ms,max_rss_kib,artifact_bytes,stdout_sha256\n' > "$CSV"
+printf 'mode,fold,example,build_ms,max_rss_kib,artifact_bytes\n' > "$OUT/results/builds.csv"
 
 export CARGO_INCREMENTAL=0
-export CARGO_NET_OFFLINE=false
-unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER CARGO_ENCODED_RUSTFLAGS || true
+unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER CARGO_ENCODED_RUSTFLAGS RUSTFLAGS || true
 
-# Warm dependencies before the measured builds, then use offline resolution.
+# Warm dependencies before measured builds; all subsequent Cargo commands run
+# offline and locked. The warm-up itself is not a performance observation.
 rustup run "$TOOLCHAIN" cargo fetch --locked
 export CARGO_NET_OFFLINE=true
 
@@ -78,11 +79,11 @@ measure_build() {
   local start end ms rss bytes
   start="$(date +%s%N)"
   if [[ -n "$flags" ]]; then
-    RUSTFLAGS="$flags" /usr/bin/time -f 'max_rss_kib=%M' -o "$timefile" \
+    env RUSTFLAGS="$flags" /usr/bin/time -f 'max_rss_kib=%M' -o "$timefile" \
       rustup run "$TOOLCHAIN" cargo build --release --locked --offline \
         --example "$example" --target-dir "$target" > "$log" 2>&1
   else
-    /usr/bin/time -f 'max_rss_kib=%M' -o "$timefile" \
+    env -u RUSTFLAGS /usr/bin/time -f 'max_rss_kib=%M' -o "$timefile" \
       rustup run "$TOOLCHAIN" cargo build --release --locked --offline \
         --example "$example" --target-dir "$target" > "$log" 2>&1
   fi
@@ -90,39 +91,67 @@ measure_build() {
   ms=$(((end-start)/1000000))
   rss="$(awk -F= '$1=="max_rss_kib" {print $2}' "$timefile")"
   bytes="$(stat -c %s "$target/release/examples/$example")"
+  printf '%s,%s,%s,%s,%s,%s\n' "$mode" "$fold" "$example" "$ms" "$rss" "$bytes" >> "$OUT/results/builds.csv"
   printf 'build mode=%s fold=%s example=%s elapsed_ms=%s max_rss_kib=%s artifact_bytes=%s\n' \
     "$mode" "$fold" "$example" "$ms" "$rss" "$bytes" | tee -a "$OUT/results/builds.txt"
 }
 
-run_repeats() {
-  local mode="$1" fold="$2" example="$3" binary="$4"
-  local repeat start end elapsed sha stdout stderr
+run_once() {
+  local mode="$1" fold="$2" example="$3" repeat="$4" binary="$5"
+  local stdout="$OUT/logs/$mode-$fold-$example-run-$repeat.stdout"
+  local stderr="$OUT/logs/$mode-$fold-$example-run-$repeat.stderr"
+  local timefile="$OUT/logs/$mode-$fold-$example-run-$repeat.time"
+  local start end elapsed rss digest bytes
   [[ -x "$binary" ]] || die "missing executable: $binary"
+  start="$(date +%s%N)"
+  /usr/bin/time -f 'max_rss_kib=%M' -o "$timefile" "$binary" > "$stdout" 2> "$stderr"
+  end="$(date +%s%N)"
+  elapsed=$(((end-start)/1000000))
+  rss="$(awk -F= '$1=="max_rss_kib" {print $2}' "$timefile")"
+  bytes="$(stat -c %s "$binary")"
+  digest="$(sha256sum "$stdout" | awk '{print $1}')"
+  printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
+    "$mode" "$fold" "$example" "$repeat" "$elapsed" "$rss" "$bytes" "$digest" >> "$CSV"
+  printf '%s\n' "$digest"
+}
+
+run_paired_repeats() {
+  local fold="$1" example="$2" baseline_binary="$3" pgo_binary="$4"
+  local repeat base_digest pgo_digest
   for ((repeat=1; repeat<=REPEATS; repeat++)); do
-    stdout="$OUT/logs/$mode-$fold-$example-run-$repeat.stdout"
-    stderr="$OUT/logs/$mode-$fold-$example-run-$repeat.stderr"
-    start="$(date +%s%N)"
-    "$binary" > "$stdout" 2> "$stderr"
-    end="$(date +%s%N)"
-    elapsed=$(((end-start)/1000000))
-    sha="$(sha256sum "$stdout" | awk '{print $1}')"
-    printf '%s,%s,%s,%s,%s,NA,%s,%s\n' \
-      "$mode" "$fold" "$example" "$repeat" "$elapsed" \
-      "$(stat -c %s "$binary")" "$sha" >> "$CSV"
+    # Rotate the first binary each trial to reduce order/thermal bias.
+    if (( repeat % 2 == 1 )); then
+      base_digest="$(run_once baseline "$fold" "$example" "$repeat" "$baseline_binary")"
+      pgo_digest="$(run_once pgo "$fold" "$example" "$repeat" "$pgo_binary")"
+    else
+      pgo_digest="$(run_once pgo "$fold" "$example" "$repeat" "$pgo_binary")"
+      base_digest="$(run_once baseline "$fold" "$example" "$repeat" "$baseline_binary")"
+    fi
+    [[ "$base_digest" == "$pgo_digest" ]] || {
+      echo "Scientific output digest changed for fold=$fold example=$example repeat=$repeat" >&2
+      echo "baseline=$base_digest" >&2
+      echo "pgo=$pgo_digest" >&2
+      exit 1
+    }
   done
 }
 
-# One unprofiled release build per example; those binaries provide the matched
-# baseline runtime for each held-out fold.
+median() {
+  sort -n | awk '{ values[NR]=$1 } END {
+    if (NR == 0) exit 1;
+    if (NR % 2) printf "%.6f", values[(NR+1)/2];
+    else printf "%.6f", (values[NR/2] + values[NR/2+1]) / 2;
+  }'
+}
+
+# Build one unprofiled release binary for each example. Runtime observations
+# will be interleaved with each fold's held-out PGO executable.
 BASE_TARGET="$OUT/targets/baseline"
 for example in "${EXAMPLES[@]}"; do
   measure_build baseline none "$example" "$BASE_TARGET" ""
-  run_repeats baseline none "$example" "$BASE_TARGET/release/examples/$example"
 done
 
-# Three-fold cross validation. Each fold trains an instrumentation profile on
-# two workloads and evaluates the third workload only after rebuilding with
-# that profile. No held-out workload contributes to its own fold's profile.
+# Three-fold leave-one-example-out PGO. Each profile uses the other two examples.
 for heldout in "${EXAMPLES[@]}"; do
   fold="heldout-$heldout"
   profile_dir="$OUT/profiles/$fold"
@@ -136,7 +165,7 @@ for heldout in "${EXAMPLES[@]}"; do
   done
   [[ "${#train[@]}" -eq 2 ]] || die "expected two training examples for $fold"
 
-  # Instrument all three example artifacts, but execute only the two declared
+  # Instrument all example binaries, but execute only the two declared
   # training workloads while collecting the profile.
   for example in "${EXAMPLES[@]}"; do
     measure_build instrumented "$fold" "$example" "$profile_target" "-Cprofile-generate=$profile_dir"
@@ -158,21 +187,37 @@ for heldout in "${EXAMPLES[@]}"; do
 
   measure_build pgo "$fold" "$heldout" "$pgo_target" \
     "-Cprofile-use=$profdata -Cllvm-args=-pgo-warn-missing-function"
-  run_repeats pgo "$fold" "$heldout" "$pgo_target/release/examples/$heldout"
+  run_paired_repeats "$fold" "$heldout" \
+    "$BASE_TARGET/release/examples/$heldout" \
+    "$pgo_target/release/examples/$heldout"
 
-  # PGO and baseline must preserve the exact deterministic stdout for the same
-  # held-out workload. If not, fail rather than trading scientific semantics
-  # for a faster binary.
-  base_digest="$(awk -F, -v e="$heldout" '$1=="baseline" && $3==e && $4==1 {print $8}' "$CSV")"
+  base_digests="$(awk -F, -v f="$fold" '$1=="baseline" && $2==f {print $8}' "$CSV" | sort -u)"
   pgo_digests="$(awk -F, -v f="$fold" '$1=="pgo" && $2==f {print $8}' "$CSV" | sort -u)"
-  [[ -n "$base_digest" && "$pgo_digests" == "$base_digest" ]] || {
-    echo "Scientific output digest changed for $fold." >&2
-    echo "baseline=$base_digest" >&2
-    echo "pgo=$pgo_digests" >&2
-    exit 1
-  }
+  [[ -n "$base_digests" && "$base_digests" == "$pgo_digests" ]] || die "repeated output digests are not identical for $fold"
   echo "heldout_output_identity_$fold=PASS" | tee -a "$OUT/results/claim-gates.txt"
 done
+
+# Descriptive median paired speedup by held-out workload. A ratio > 1 means
+# PGO was faster. This is exploratory evidence, not a confidence interval.
+{
+  echo "# Held-out PGO runtime medians"
+  echo
+  echo "| Held-out example | Baseline median ms | PGO median ms | Median paired speedup |"
+  echo "|---|---:|---:|---:|"
+  for example in "${EXAMPLES[@]}"; do
+    fold="heldout-$example"
+    baseline_times="$(awk -F, -v f="$fold" '$1=="baseline" && $2==f {print $5}' "$CSV")"
+    pgo_times="$(awk -F, -v f="$fold" '$1=="pgo" && $2==f {print $5}' "$CSV")"
+    baseline_median="$(printf '%s\n' "$baseline_times" | median)"
+    pgo_median="$(printf '%s\n' "$pgo_times" | median)"
+    ratios="$(awk -F, -v f="$fold" '
+      $2==f && $1=="baseline" {b[$4]=$5}
+      $2==f && $1=="pgo" && ($4 in b) && $5>0 {print b[$4]/$5}
+    ' "$CSV")"
+    ratio_median="$(printf '%s\n' "$ratios" | median)"
+    printf '| %s | %s | %s | %s |\n' "$example" "$baseline_median" "$pgo_median" "$ratio_median"
+  done
+} | tee "$OUT/results/heldout-medians.md" | tee -a "$GITHUB_STEP_SUMMARY"
 
 LOCK_AFTER="$(sha256sum Cargo.lock | awk '{print $1}')"
 [[ "$LOCK_SHA" == "$LOCK_AFTER" ]] || die "Cargo.lock changed during PGO qualification"
@@ -187,7 +232,8 @@ echo "pgo_validation=COMPLETE_EXPLORATORY" > "$OUT/STATUS.txt"
   echo "- Source: $SOURCE_SHA"
   echo "- Cargo.lock SHA-256: $LOCK_SHA"
   echo "- Held-out workloads: ${EXAMPLES[*]}"
-  echo "- Repeats per measured condition: $REPEATS"
+  echo "- Repeats per held-out condition: $REPEATS"
+  echo "- Runtime order: alternating baseline/PGO within each repeat"
   echo "- Output identity gate: PASS for all folds"
   echo "- Claim ceiling: exploratory held-out runtime measurements only; not p99 and not a claim that PGO beats SOTA."
 } | tee "$OUT/results/report.txt" | tee -a "$GITHUB_STEP_SUMMARY"
