@@ -21,6 +21,14 @@ A profile should not be an anonymous `.profdata` or `.prof` file copied between 
 
 The profile's provenance is part of the artifact's trust boundary.
 
+The runner writes a `metadata/run-manifest.txt` containing the source commit/tree, Cargo.lock and metadata digests, exact compiler/Cargo/LLVM identities, codegen flags, profile hash, training identity, kernel, CPU, memory, filesystem and governor metadata. The build table records each fresh build trial and the exact executable SHA-256.
+
+After paired analysis, `scripts/seal-rust-pgo-evidence.sh` creates:
+- `evidence-files.sha256`, covering the raw profile, profiler data, binaries/targets, logs, CSVs, analysis and run manifest;
+- `integrity-manifest.txt`, binding the run-manifest digest and evidence-file-list digest.
+
+The workflow then invokes `scripts/verify-rust-pgo-evidence.sh RESULT_DIR SOURCE_CHECKOUT`. It re-hashes every file, verifies the source commit/tree and Cargo.lock against the exact checkout, confirms toolchain identity, and emits only `PASS_EVIDENCE_INTEGRITY_ONLY`. A matching digest list proves content integrity against the manifest; it does not sign the producer, attest the host, prove physical execution authenticity, or establish correctness/performance.
+
 ## Two distinct PGO lanes
 
 Do not conflate instrumentation PGO and sample-based PGO. Their profiles are not interchangeable.
