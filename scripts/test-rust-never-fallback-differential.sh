@@ -24,10 +24,19 @@ done
 expect_compile() {
   local toolchain="$1" edition="$2" expected="$3"
   local log="$WORK/$toolchain-$edition.log"
+  local cap_args=()
+  # Rust 1.99 emits the never-fallback migration lint by default. Cap lint
+  # severity only for the historical baseline compile so this probe measures
+  # the inferred type; type errors remain errors. The 1.100 candidate is never
+  # capped, so its !: Default failure must remain observable.
+  if [[ "$toolchain" == "$BASELINE" ]]; then
+    cap_args+=(--cap-lints allow)
+  fi
   set +e
   rustup run "$toolchain" rustc \
     --edition="$edition" \
     --crate-type=bin \
+    "${cap_args[@]}" \
     "$SOURCE" \
     -o "$WORK/probe-$toolchain-$edition" \
     > "$log" 2>&1
