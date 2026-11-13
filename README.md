@@ -89,3 +89,8 @@ Stoltz, T. (2026). Social Structure Without Social Mechanisms:
 By-Product Mutualism in Energy-Constrained Multi-Agent Systems.
 Luminous Dynamics. https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physics
 ```
+
+
+## Research: cross-validated PGO
+
+The Rust 1.100 instrumentation-PGO pilot is documented in [RUST_1_100_INSTRUMENTATION_PGO_CROSS_VALIDATION.md](docs/research/RUST_1_100_INSTRUMENTATION_PGO_CROSS_VALIDATION.md) and run by `.github/workflows/rust-1-100-pgo-cross-validation.yml`. The three-fold design uses two examples to train each profile and keeps the third held out, with alternating paired baseline/PGO runtime execution and exact stdout identity gates. No PGO win is assumed or claimed before a completed evidence artifact exists.

@@ -1,0 +1,67 @@
+name: Symtropy Rust 1.100 instrumentation PGO cross-validation
+
+on:
+  pull_request:
+    paths:
+      - "scripts/benchmark-rust-pgo-cross-validation.sh"
+      - "docs/research/RUST_1_100_INSTRUMENTATION_PGO_CROSS_VALIDATION.md"
+      - ".github/workflows/rust-1-100-pgo-cross-validation.yml"
+      - "examples/gradient_replacement.rs"
+      - "examples/cooperation_decomposition.rs"
+      - "examples/jphi_convergence.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symtropy-pgo-cross-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross-validated-pgo:
+    name: Three-fold held-out instrumentation PGO
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      PGO_RUNTIME_REPEATS: "10"
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact Rust 1.100.0 and LLVM profile tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup component add llvm-tools-preview --toolchain 1.100.0
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+          rustup run 1.100.0 rustc -Vv
+          rustup run 1.100.0 cargo -Vv
+          HOST="$(rustup run 1.100.0 rustc -vV | sed -n 's/^host: //p')"
+          SYSROOT="$(rustup run 1.100.0 rustc --print sysroot)"
+          test -x "$SYSROOT/lib/rustlib/$HOST/bin/llvm-profdata"
+
+      - name: Run cross-validated instrumentation PGO
+        run: bash scripts/benchmark-rust-pgo-cross-validation.sh 1.100.0 benchmark-results/rust-pgo
+
+      - name: Confirm scientific inputs and dependency lock remain unchanged
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- Cargo.toml Cargo.lock examples/gradient_replacement.rs examples/cooperation_decomposition.rs examples/jphi_convergence.rs
+
+      - name: Upload complete PGO evidence (including failed-run diagnostics)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: symtropy-rust-1.100-pgo-${{ github.sha }}
+          path: benchmark-results/rust-pgo/
+          if-no-files-found: warn
+          retention-days: 30
