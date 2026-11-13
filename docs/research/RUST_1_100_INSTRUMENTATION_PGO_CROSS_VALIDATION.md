@@ -44,7 +44,7 @@ For baseline and each PGO fold:
 - repeated output digest;
 - compiler metadata, Cargo lock identity and host metadata.
 
-The first pass defaults to 10 repeats per workload and is exploratory. It must not produce p99 claims. Extend to 30+ paired independent runs for ordinary latency claims and 10,000+ observations for p99. A performance result must be reported with medians, dispersion and confidence intervals, not a best-run comparison.
+The workflow .github/workflows/rust-1-100-pgo-cross-validation.yml runs the script on an exact Rust 1.100.0 toolchain and uploads the complete evidence bundle. The script alternates baseline/PGO execution order within each repeat, measures both variants for the same held-out workload, checks paired output digests and emits median runtime and median paired speedup ratios per fold. Build wall time/RSS/artifact size are recorded separately from runtime. The first pass defaults to 10 paired repeats per held-out workload and is exploratory. It must not produce p99 claims. Extend to 30+ paired independent runs for ordinary latency claims and 10,000+ observations for p99. A performance result must be reported with medians, dispersion and confidence intervals, not a best-run comparison.
 
 ## PGO variants and future research
 
