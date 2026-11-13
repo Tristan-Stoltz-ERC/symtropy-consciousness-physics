@@ -6,15 +6,17 @@ on:
       - "benchmarks/rust-toolchain/**"
       - "scripts/benchmark-rust-1.99.1-vs-1.100.0.sh"
       - "scripts/analyze-rust-toolchain-benchmark.sh"
-      - "scripts/rust-1.99.1-vs-1.100.0-performance.yml"
+      - ".github/workflows/rust-1-99-1-vs-1-100-0-performance.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer qualification commit must not cancel an in-progress benchmark.
+# One pending benchmark per PR/ref is enough; keep a running measurement intact.
 concurrency:
   group: rust-compiler-performance-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   paired-benchmark:
@@ -49,7 +51,7 @@ jobs:
           rustup run 1.100.0 rustc -Vv
           rustup run 1.100.0 cargo -Vv
 
-      - name: Run five paired fresh-target trials
+      - name: Run five paired fresh-target trials with Cargo timing reports
         run: bash scripts/benchmark-rust-1.99.1-vs-1.100.0.sh
 
       - name: Analyse paired results with deterministic bootstrap
@@ -72,6 +74,7 @@ jobs:
             echo "- Cargo.lock SHA-256: $(sha256sum Cargo.lock | awk '{print $1}')"
             echo "- Toolchains: exact 1.99.1 and 1.100.0"
             echo "- Trials: $BUILD_REPEATS paired builds, $RUNTIME_REPEATS runtimes per trial"
+            echo "- Cargo --timings: one HTML critical-path report per clean target build"
             echo
             RUSTC_TOOLCHAIN=1.100.0 bash scripts/analyze-rust-toolchain-benchmark.sh "$CSV" 1.99.1 1.100.0
           } | tee "$OUT/results/analysis.md" | tee -a "$GITHUB_STEP_SUMMARY"
