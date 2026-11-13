@@ -57,6 +57,16 @@
     "PASS_MECHANICAL_PROFILE_AND_OUTPUT_CHECKS does not establish a speedup",
     "cross-example transfer is not an IID held-out split",
     "PMU unavailability is NOT_EVALUABLE, not PASS or FAIL for compiler compatibility",
-    "sample and instrumentation profiles are not interchangeable"
-  ]
+    "sample and instrumentation profiles are not interchangeable",
+    "Runtime repeats nested inside one build trial do not increase the count of independent compiler/build trials"
+  ],
+  "experiment_design": {
+    "build_repeats_default": 5,
+    "runtime_repeats_per_build_default": 5,
+    "build_trial_is_fresh_target_directory": true,
+    "rotate_build_and_runtime_order": true,
+    "match_debug_info_flags_between_variants": true,
+    "measure_compile_time_and_peak_rss_per_build_trial": true,
+    "nested_runtime_repeats_are_not_independent_build_trials": true
+  }
 }
