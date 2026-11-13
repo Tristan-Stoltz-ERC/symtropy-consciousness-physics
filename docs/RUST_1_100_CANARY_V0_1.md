@@ -161,3 +161,59 @@ Promote only after:
 6. a separate reviewed change proposes updating the default pin.
 
 No performance superiority or repository-wide compatibility claim is made by the presence of this workflow.
+
+
+## Exact-hosted evidence update — 2026-11-13
+
+The exact Rust 1.100.0 stable distribution is now installed and identified by hosted runners as:
+
+- rustc `1.100.0 (0ef1bc386 2026-11-09)`
+- Cargo `1.100.0 (3acc79c0c 2026-11-05)`
+
+Run [#43426972144](https://github.com/Tristan-Stoltz-ERC/symtropy-consciousness-physics/actions/runs/43426972144) on the exact PR merge tree reported:
+
+### Passed
+
+- Rust 1.100.0 supported-library qualification: PASS.
+- Library unit tests: **104 passed, 0 failed**.
+- Locked graph under the 14-day minimum publish-age policy: PASS.
+- Clippy, rustdoc, metadata and lockfile immutability: PASS.
+- Raw x86_64 FFI bool ABI: `ffi_bool_abi=PASS`, `ffi_bool_raw_eax=PASS`.
+- Cargo-native `unused_dependencies` isolated fixture: PASS.
+- Cargo JSON compiler-artifact manifest: PASS.
+- Dependency-free benchmark analyzer compile/self-test: PASS.
+- Rust 1.100 language/edition differential and ABI suite: PASS.
+- Stable Cargo publish-age controls: all three PASS (old-version fallback, fresh-only rejection, existing-lock exception).
+
+The local registry emitted the expected diagnostics: it selected the 30-day-old version when a one-hour-old version was also available, rejected the one-hour-old version when it was the only candidate under deny, and preserved that fresh version when it was already in Cargo.lock and Cargo ran with `--locked`. The server was loopback-only.
+
+### Supported-target failure and subsequent source repairs
+
+The earlier `hdc_cooperation` source/API defect has now been handled as an explicit archive, not hidden behind a placeholder:
+
+- Original source preserved at `research/archived-examples/hdc_cooperation.rs`.
+- Original source blob SHA-1: `2464da8339ee1d8cf77e9806fce91f4832033493`.
+- Unbuildable auto-discovered path `examples/hdc_cooperation.rs` removed.
+- Archive/restoration contract documented at `docs/research/ARCHIVED_HDC_COOPERATION_EXPERIMENT.md`.
+- The archive-disposition assertions passed on Rust 1.99.1 and 1.100.0.
+
+The next `--all-targets` run progressed beyond HDC and then found a distinct feature-metadata defect: `examples/curvature_lensing.rs` consumes the feature-gated `curvature` module and `HarmonyField::sigma_gradient`, but Cargo had no `required-features` declaration for this auto-discovered example. The source's own run instructions already require `--features consciousness-curvature`; the method and module are correctly cfg-gated. The root manifest now explicitly declares:
+
+```toml
+[[example]]
+name = "curvature_lensing"
+path = "examples/curvature_lensing.rs"
+required-features = ["consciousness-curvature"]
+```
+
+The curvature feature workflow now checks both `curvature_selforg` and `curvature_lensing` on 1.99.1, 1.100.0 and 1.101.0-beta.1. These latest checks and the next full supported-target build are pending; no all-target pass is claimed yet.
+
+The HDC issue #3 is therefore resolved at the source-disposition level, while all-target qualification remains blocked pending the separate curvature metadata fix's exact-head run. This is intentionally tracked as two separate source/API decisions rather than a compiler regression.
+
+### Current performance evidence boundary
+
+The paired 1.99.1 versus 1.100.0 application benchmark remains separate from compatibility. It uses five paired fresh-target trials, a warmed registry, offline locked builds, no sccache wrapper, rotated compiler order, and records time/RSS/target size/binary size/runtime/output hashes. Its current hosted run is still in progress. Even when it completes, five runs are exploratory: no p99 claim, and no general compiler-wide SOTA claim. Upstream rustc-perf remains the compiler-wide reference; Symtropy's deterministic simulations are the application reference.
+
+### Promotion
+
+The repository default remains Rust 1.99.1 until the entire supported target surface and any candidate-only differences are resolved, with the matched performance and scientific-result evidence reviewed. Passing the 1.100.0 library and isolated feature suites is not equivalent to qualifying every example, target, Holochain guest, or runtime.
