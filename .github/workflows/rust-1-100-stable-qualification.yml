@@ -199,7 +199,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rustup toolchain install 1.99.1 --profile minimal
           rustup toolchain install 1.100.0 --profile minimal --component rustfmt
+          RUSTC_BASELINE="$(rustup run 1.99.1 rustc --version)"
+          CARGO_BASELINE="$(rustup run 1.99.1 cargo --version)"
+          [[ "$RUSTC_BASELINE" == "rustc 1.99.1 "* ]]
+          [[ "$CARGO_BASELINE" == "cargo 1.99.1 "* ]]
           RUSTC_VERSION="$(rustup run 1.100.0 rustc --version)"
           CARGO_VERSION="$(rustup run 1.100.0 cargo --version)"
           [[ "$RUSTC_VERSION" == "rustc 1.100.0 "* ]]
@@ -210,6 +215,8 @@ jobs:
         run: bash scripts/test-rust-ffi-bool.sh 1.100.0 1.100.0
       - name: Qualify stabilized never type across editions 2018, 2021 and 2024
         run: bash scripts/test-rust-1.100-language.sh 1.100.0 1.100.0
+      - name: Verify the never-type fallback change against Rust 1.99.1
+        run: bash scripts/test-rust-never-fallback-differential.sh 1.99.1 1.100.0
       - name: Exercise Cargo-native unused dependency lint
         run: bash scripts/test-cargo-1.100-lints.sh 1.100.0 1.100.0
       - name: Capture Cargo artifact manifest from isolated fixture
