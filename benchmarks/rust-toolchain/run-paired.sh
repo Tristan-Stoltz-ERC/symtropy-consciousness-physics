@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 # Compare exact Rust toolchains with identical source/lock inputs, separate
 # target directories, warmed registry cache, offline measured builds, rotated
-# trial order, resource measurements and raw simulation output digests.
+# trial order, resource measurements, Cargo critical-path reports and raw
+# simulation output digests.
 
 read -r -a TOOLCHAINS <<< "${TOOLCHAINS:-1.96.1 1.99.1}"
 BUILD_REPEATS="${BUILD_REPEATS:-5}"
@@ -29,10 +30,13 @@ LOCK_BEFORE="$(sha256sum Cargo.lock | awk '{print $1}')"
 for toolchain in "${TOOLCHAINS[@]}"; do
   rustc_version="$(rustup run "$toolchain" rustc --version)" || die "toolchain not installed: $toolchain"
   cargo_version="$(rustup run "$toolchain" cargo --version)" || die "Cargo missing for $toolchain"
-  case "$toolchain" in
-    beta) [[ "$rustc_version" == *"-beta"* || "$rustc_version" == *"1.100.0"* ]] || die "beta selector did not resolve to a beta/release compiler: $rustc_version" ;;
-    *) printf '%s\n' "$rustc_version" | grep -F "$toolchain" >/dev/null || die "unexpected rustc version: $rustc_version" ;;
-  esac
+  if [[ "$toolchain" == beta ]]; then
+    [[ "$rustc_version" == *"-beta"* ]] || die "beta selector did not resolve to a beta compiler: $rustc_version"
+    [[ "$cargo_version" == *"-beta"* ]] || die "beta selector did not resolve to matching beta Cargo: $cargo_version"
+  else
+    [[ "$rustc_version" == "rustc $toolchain "* ]] || die "unexpected rustc version for $toolchain: $rustc_version"
+    [[ "$cargo_version" == "cargo $toolchain "* ]] || die "unexpected Cargo version for $toolchain: $cargo_version"
+  fi
   printf 'toolchain=%s rustc=%s cargo=%s\n' "$toolchain" "$rustc_version" "$cargo_version"
   rustup run "$toolchain" cargo fetch --locked
 done
@@ -50,7 +54,7 @@ for toolchain in "${TOOLCHAINS[@]}"; do
 done
 
 {
-  echo "schema=luminous.rust-toolchain-benchmark.v0.2"
+  echo "schema=luminous.rust-toolchain-benchmark.v0.3"
   echo "commit=$(git rev-parse HEAD)"
   echo "worktree=clean"
   echo "cargo_lock_sha256=$LOCK_BEFORE"
@@ -68,6 +72,7 @@ done
   echo "cache_policy=fresh-target-per-toolchain-trial; shared-warmed-registry; page-cache-not-dropped"
   echo "cargo_incremental=0"
   echo "cargo_network=offline_during_measurement"
+  echo "cargo_timings=enabled"
   echo "sccache=disabled_for_primary_comparison"
   echo "examples=${EXAMPLES[*]}"
 } > "$OUT/metadata.txt"
@@ -95,14 +100,14 @@ for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
         "$TIME_BIN" -f 'max_rss_kib=%M' -o "$log_prefix-build.time" \
           env -u RUSTC_WRAPPER -u RUSTC_WORKSPACE_WRAPPER \
           rustup run "$toolchain" cargo build \
-            --release --locked --offline --example "$example" \
+            --release --locked --offline --timings --example "$example" \
             --target-dir "$target_dir" \
             > "$log_prefix-build.log" 2>&1
         status=$?
       else
         env -u RUSTC_WRAPPER -u RUSTC_WORKSPACE_WRAPPER \
           rustup run "$toolchain" cargo build \
-            --release --locked --offline --example "$example" \
+            --release --locked --offline --timings --example "$example" \
             --target-dir "$target_dir" \
             > "$log_prefix-build.log" 2>&1
         status=$?
@@ -117,6 +122,10 @@ for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
       build_ms=$(((end_ns - start_ns) / 1000000))
       rss="$(awk -F= '$1=="max_rss_kib" {print $2}' "$log_prefix-build.time" 2>/dev/null || echo NA)"
       target_bytes="$(du -sb "$target_dir" 2>/dev/null | awk '{print $1}' || echo NA)"
+
+      timing_report="$(find "$target_dir" -type f -path '*/cargo-timings/cargo-timing.html' -print -quit)"
+      [[ -n "$timing_report" && -s "$timing_report" ]] || die "Cargo timing report missing for $toolchain trial=$trial example=$example"
+      cp "$timing_report" "$log_prefix-cargo-timing.html"
 
       binary="$target_dir/release/examples/$example"
       [[ -x "$binary" ]] || die "expected benchmark executable missing: $binary"
@@ -134,8 +143,8 @@ for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
           "$toolchain" "$trial" "$example" "$build_ms" "$rss" \
           "$target_bytes" "$binary_bytes" "$runtime_repeat" "$runtime_ms" "$digest" >> "$CSV"
       done
-      printf 'trial=%s toolchain=%s example=%s build_ms=%s rss_kib=%s\n' \
-        "$trial" "$toolchain" "$example" "$build_ms" "$rss"
+      printf 'trial=%s toolchain=%s example=%s build_ms=%s rss_kib=%s timing_report=%s\n' \
+        "$trial" "$toolchain" "$example" "$build_ms" "$rss" "$log_prefix-cargo-timing.html"
     done
   done
 done
