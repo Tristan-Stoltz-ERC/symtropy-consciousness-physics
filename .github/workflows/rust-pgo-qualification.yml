@@ -60,6 +60,8 @@ jobs:
           bash -n scripts/run-rust-sample-pgo.sh
           bash -n scripts/seal-rust-pgo-evidence.sh
           bash -n scripts/verify-rust-pgo-evidence.sh
+          grep -F -- 'PASS_EVIDENCE_INTEGRITY_ONLY' scripts/verify-rust-pgo-evidence.sh
+          grep -F -- 'evidence-files.sha256' scripts/seal-rust-pgo-evidence.sh
           grep -F -- '-Cprofile-generate' scripts/run-rust-pgo-instrumented.sh
           grep -F -- '-Cprofile-use' scripts/run-rust-pgo-instrumented.sh
           grep -F -- '-Cprofile-sample-use' scripts/run-rust-sample-pgo.sh
