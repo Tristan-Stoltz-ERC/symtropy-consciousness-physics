@@ -276,6 +276,43 @@ jobs:
         run: bash scripts/test-cargo-publish-age.sh 1.101.0-beta.1 1.101.0-beta.1
 
   curvature-example-feature-contract:
+    name: Curvature examples require and compile with feature
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: ["1.99.1", "1.100.0"]
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact stable toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: ${{ matrix.rust }}
+      - name: Verify examples are excluded without the feature
+        shell: bash
+        run: |
+          set -euo pipefail
+          for example in curvature_lensing curvature_selforg curvature_cooperation; do
+            if cargo +${{ matrix.rust }} check --locked --example "$example" > "$RUNNER_TEMP/$example-no-feature.log" 2>&1; then
+              echo "ERROR: $example unexpectedly compiled without consciousness-curvature." >&2
+              exit 1
+            fi
+            grep -F "requires the features" "$RUNNER_TEMP/$example-no-feature.log"
+            grep -F "consciousness-curvature" "$RUNNER_TEMP/$example-no-feature.log"
+          done
+      - name: Compile all feature-gated curvature examples
+        run: |
+          set -euo pipefail
+          for example in curvature_lensing curvature_selforg curvature_cooperation; do
+            cargo +${{ matrix.rust }} check --locked --example "$example" --features consciousness-curvature
+          done
+      - name: Enforce Cargo.lock immutability
+        run: git diff --exit-code -- Cargo.lock
+
     name: Curvature example feature contract (stable and beta)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
