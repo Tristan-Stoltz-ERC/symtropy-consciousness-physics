@@ -40,6 +40,18 @@ PROFGEN_MAJOR="$(printf '%s\n' "$PROFGEN_VERSION" | sed -nE 's/.*LLVM version: (
 
 LOCK_BEFORE="$(sha256sum Cargo.lock | awk '{print $1}')"
 COMMIT="$(git rev-parse HEAD)"
+SOURCE_TREE="$(git rev-parse 'HEAD^{tree}')"
+KERNEL="$(uname -srmo)"
+CPU_MODEL="$(lscpu 2>/dev/null | grep -m1 'Model name:' | sed 's/^[^:]*:[[:space:]]*//' || echo unavailable)"
+CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo unknown)"
+MEMORY_TOTAL="$(grep -m1 '^MemTotal:' /proc/meminfo 2>/dev/null || echo unavailable)"
+FILESYSTEM="$(stat -f -c %T "$PWD" 2>/dev/null || echo unknown)"
+MOUNT_INFO="$(findmnt -no SOURCE,FSTYPE,OPTIONS -T "$PWD" 2>/dev/null || echo unavailable)"
+CPU_GOVERNOR="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo unavailable)"
+PERF_VERSION="$(perf --version 2>&1 | head -n1)"
+PERF_PARANOID="$(cat /proc/sys/kernel/perf_event_paranoid 2>/dev/null || echo unavailable)"
+PROFGEN_BIN="$(command -v llvm-profgen)"
+PROFGEN_SHA="$(sha256sum "$PROFGEN_BIN" | awk '{print $1}')"
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT="$RESULT_ROOT/$COMMIT-$TOOLCHAIN-$RUN_ID"
 PROFILE="$OUT/$EXAMPLE.prof"
@@ -53,6 +65,8 @@ export CARGO_INCREMENTAL=0
 export CARGO_NET_OFFLINE=true
 export CARGO_TERM_COLOR=never
 rustup run "$TOOLCHAIN" cargo fetch --locked
+rustup run "$TOOLCHAIN" cargo metadata --locked --format-version 1 --no-deps > "$OUT/metadata/cargo-metadata.json"
+CARGO_METADATA_SHA="$(sha256sum "$OUT/metadata/cargo-metadata.json" | awk '{print $1}')"
 
 # The profiling and measured builds all use the same line-table setting.
 set +e
@@ -134,7 +148,7 @@ declare -A BASE_BINARY BASE_BYTES PGO_BINARY PGO_BYTES
 declare -A BASE_DIGEST PGO_DIGEST
 
 printf 'toolchain,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes,runtime_repeat,runtime_ms,stdout_sha256\n' > "$OUT/metadata/runtime.csv"
-printf 'variant,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes\n' > "$OUT/metadata/builds.csv"
+printf 'variant,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes,binary_sha256\n' > "$OUT/metadata/builds.csv"
 printf 'variant,trial,runtime_repeat,stdout_sha256,stderr_sha256\n' > "$OUT/metadata/output-digests.csv"
 
 for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
@@ -152,12 +166,12 @@ for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
   BASE_BIN="$base_dir/$HOST/release/examples/$EXAMPLE"
   PGO_BIN="$pgo_dir/$HOST/release/examples/$EXAMPLE"
   [[ -x "$BASE_BIN" && -x "$PGO_BIN" ]] || die "paired sample-PGO binary missing"
-  BASE_BINARY[$trial]="$(stat -c %s "$BASE_BIN")"; BASE_BYTES[$trial]="$(du -sb "$base_dir" | awk '{print $1}')"
-  PGO_BINARY[$trial]="$(stat -c %s "$PGO_BIN")"; PGO_BYTES[$trial]="$(du -sb "$pgo_dir" | awk '{print $1}')"
+  BASE_BINARY[$trial]="$(stat -c %s "$BASE_BIN")"; BASE_BINARY_SHA[$trial]="$(sha256sum "$BASE_BIN" | awk '{print $1}')"; BASE_BYTES[$trial]="$(du -sb "$base_dir" | awk '{print $1}')"
+  PGO_BINARY[$trial]="$(stat -c %s "$PGO_BIN")"; PGO_BINARY_SHA[$trial]="$(sha256sum "$PGO_BIN" | awk '{print $1}')"; PGO_BYTES[$trial]="$(du -sb "$pgo_dir" | awk '{print $1}')"
   BASE_BUILD_MS[$trial]="$BASE_BUILD_MS"; BASE_BUILD_RSS[$trial]="$BASE_BUILD_RSS"
   PGO_BUILD_MS[$trial]="$PGO_BUILD_MS"; PGO_BUILD_RSS[$trial]="$PGO_BUILD_RSS"
-  printf 'no-pgo,%s,%s,%s,%s,%s,%s\n' "$trial" "$EXAMPLE" "$BASE_BUILD_MS" "$BASE_BUILD_RSS" "${BASE_BYTES[$trial]}" "${BASE_BINARY[$trial]}" >> "$OUT/metadata/builds.csv"
-  printf 'sample-pgo,%s,%s,%s,%s,%s,%s\n' "$trial" "$EXAMPLE" "$PGO_BUILD_MS" "$PGO_BUILD_RSS" "${PGO_BYTES[$trial]}" "${PGO_BINARY[$trial]}" >> "$OUT/metadata/builds.csv"
+  printf 'no-pgo,%s,%s,%s,%s,%s,%s,%s\n' "$trial" "$EXAMPLE" "$BASE_BUILD_MS" "$BASE_BUILD_RSS" "${BASE_BYTES[$trial]}" "${BASE_BINARY[$trial]}" "${BASE_BINARY_SHA[$trial]}" >> "$OUT/metadata/builds.csv"
+  printf 'sample-pgo,%s,%s,%s,%s,%s,%s,%s\n' "$trial" "$EXAMPLE" "$PGO_BUILD_MS" "$PGO_BUILD_RSS" "${PGO_BYTES[$trial]}" "${PGO_BINARY[$trial]}" "${PGO_BINARY_SHA[$trial]}" >> "$OUT/metadata/builds.csv"
 
   for ((repeat=1; repeat<=RUNTIME_REPEATS; repeat++)); do
     if (((trial+repeat)%2==0)); then
@@ -189,17 +203,35 @@ done
 
 LOCK_AFTER="$(sha256sum Cargo.lock | awk '{print $1}')"
 [[ "$LOCK_BEFORE" == "$LOCK_AFTER" ]] || die "Cargo.lock changed despite --locked"
+
+RUSTC_TOOLCHAIN="$TOOLCHAIN" bash scripts/analyze-rust-toolchain-benchmark.sh \
+  "$OUT/metadata/runtime.csv" no-pgo sample-pgo > "$OUT/metadata/paired-analysis.md"
+
 {
-  echo "schema=luminous.rust-pgo-sample.v0.2"
+  echo "schema=luminous.rust-pgo-sample.v0.3"
   echo "source_commit=$COMMIT"
+  echo "source_tree=$SOURCE_TREE"
   echo "cargo_lock_sha256=$LOCK_BEFORE"
+  echo "cargo_lock_sha256_after=$LOCK_AFTER"
+  echo "cargo_metadata_sha256=$CARGO_METADATA_SHA"
   echo "rustc=$RUSTC_VERSION"
   echo "cargo=$CARGO_VERSION"
   echo "rustc_llvm=$LLVM_VERSION"
   echo "llvm_profgen=$PROFGEN_VERSION"
+  echo "llvm_profgen_path=$PROFGEN_BIN"
+  echo "llvm_profgen_sha256=$PROFGEN_SHA"
+  echo "perf_version=$PERF_VERSION"
+  echo "perf_event=$PERF_EVENT"
+  echo "perf_event_paranoid=$PERF_PARANOID"
+  echo "kernel=$KERNEL"
+  echo "cpu_model=$CPU_MODEL"
+  echo "cpu_count=$CPU_COUNT"
+  echo "memory_total=$MEMORY_TOTAL"
+  echo "filesystem=$FILESYSTEM"
+  echo "mount_info=$MOUNT_INFO"
+  echo "cpu_governor=$CPU_GOVERNOR"
   echo "target=$HOST"
   echo "training_example=$EXAMPLE"
-  echo "perf_event=$PERF_EVENT"
   echo "perf_data_sha256=$(sha256sum "$PERFDATA" | awk '{print $1}')"
   echo "sample_profile_sha256=$(sha256sum "$PROFILE" | awk '{print $1}')"
   echo "sample_profile_bytes=$(stat -c %s "$PROFILE")"
@@ -207,10 +239,12 @@ LOCK_AFTER="$(sha256sum Cargo.lock | awk '{print $1}')"
   echo "runtime_repeats_per_build=$RUNTIME_REPEATS"
   echo "target_directories=fresh_per_variant_trial"
   echo "build_flags=matched line-tables-only; profile flags are the treatment"
+  echo "profile_sample_use_flags=-Cdebuginfo=line-tables-only -Cprofile-sample-use=<profile> -Cllvm-args=-pgo-warn-missing-function"
   echo "trial_order=rotated_for_build_and_runtime"
   echo "observable_output_equivalence=EXACT_STDOUT_AND_STDERR"
   echo "performance_claim=NOT_ESTABLISHED_BY_THIS_SCRIPT"
-} > "$OUT/manifest.txt"
+} > "$OUT/metadata/run-manifest.txt"
 printf 'PASS_MECHANICAL_SAMPLE_PROFILE_AND_OUTPUT_CHECKS\n' > "$OUT/STATUS.txt"
+bash scripts/seal-rust-pgo-evidence.sh "$OUT" metadata/run-manifest.txt
 printf 'results=%s\n' "$OUT"
 printf 'RUSTC_TOOLCHAIN=%s bash scripts/analyze-rust-toolchain-benchmark.sh %s/metadata/runtime.csv no-pgo sample-pgo\n' "$TOOLCHAIN" "$OUT"
