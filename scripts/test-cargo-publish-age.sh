@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-TOOLCHAIN="${1:-nightly-2026-11-11}"
-EXPECTED_RUSTC_PREFIX="${2:-rustc 1.102.0-nightly }"
+TOOLCHAIN="${1:-1.100.0}"
+EXPECTED_VERSION="${2:-$TOOLCHAIN}"
 ROOT="$(git rev-parse --show-toplevel)"
 WORK="$(mktemp -d)"
 SERVER_PID=""
@@ -22,12 +22,12 @@ command -v tar >/dev/null 2>&1 || { echo "tar is required" >&2; exit 2; }
 
 RUSTC_VERSION="$(rustup run "$TOOLCHAIN" rustc --version)"
 CARGO_VERSION="$(rustup run "$TOOLCHAIN" cargo --version)"
-[[ "$RUSTC_VERSION" == "$EXPECTED_RUSTC_PREFIX"* ]] || {
-  echo "Expected exact dated nightly compiler prefix '$EXPECTED_RUSTC_PREFIX'; got: $RUSTC_VERSION" >&2
+[[ "$RUSTC_VERSION" == "rustc $EXPECTED_VERSION "* ]] || {
+  echo "Expected exact compiler rustc $EXPECTED_VERSION; got: $RUSTC_VERSION" >&2
   exit 2
 }
-[[ "$CARGO_VERSION" == cargo\ 1.102.0-nightly\ * ]] || {
-  echo "Expected Cargo 1.102.0-nightly paired with the compiler; got: $CARGO_VERSION" >&2
+[[ "$CARGO_VERSION" == "cargo $EXPECTED_VERSION "* ]] || {
+  echo "Expected Cargo $EXPECTED_VERSION paired with the compiler; got: $CARGO_VERSION" >&2
   exit 2
 }
 
@@ -129,7 +129,9 @@ ALLOW_CONFIG="$WORK/cargo-allow.toml"
 cat > "$DENY_CONFIG" <<EOF
 [registries.local-age]
 index = "sparse+http://127.0.0.1:$PORT/index/"
-min-publish-age = "14 days"
+
+[registry]
+global-min-publish-age = "14 days"
 
 [resolver]
 incompatible-publish-age = "deny"
@@ -156,33 +158,28 @@ fn main() {
 EOF
 }
 
-# Control A: when a fresh release and a 30-day-old compatible release both
-# exist, deny must resolve the older version (not the latest version).
+cargo_check() {
+  local project="$1" config="$2" lockflag="${3:-}"
+  local args=(check --manifest-path "$project/Cargo.toml" --config "$config")
+  if [[ -n "$lockflag" ]]; then args+=("$lockflag"); fi
+  (cd "$WORK" && rustup run "$TOOLCHAIN" cargo "${args[@]}")
+}
+
+# Control A: deny must choose the 30-day-old compatible release.
 CHOICE="$WORK/choice"
 new_project "$CHOICE" age-choice-app age-choice ">=0.1.0, <0.3.0"
-(
-  cd "$WORK"
-  rustup run "$TOOLCHAIN" cargo -Zmin-publish-age check \
-    --manifest-path "$CHOICE/Cargo.toml" \
-    --config "$DENY_CONFIG"
-)
+cargo_check "$CHOICE" "$DENY_CONFIG"
 grep -A2 '^name = "age-choice"$' "$CHOICE/Cargo.lock" | grep -F 'version = "0.1.0"' > /dev/null || {
   echo "FAIL: resolver did not choose the 30-day-old version under a 14-day deny policy" >&2
   exit 1
 }
 echo "publish_age_old_version_fallback=PASS"
 
-# Control B: with no old version available, deny must fail specifically because
-# the only compatible version is younger than the 14-day minimum.
+# Control B: when the only compatible version is too new, deny must fail for age.
 FRESH="$WORK/fresh-only"
 new_project "$FRESH" fresh-only-app fresh-only "0.1"
 set +e
-(
-  cd "$WORK"
-  rustup run "$TOOLCHAIN" cargo -Zmin-publish-age check \
-    --manifest-path "$FRESH/Cargo.toml" \
-    --config "$DENY_CONFIG"
-) > "$WORK/fresh-deny.log" 2>&1
+cargo_check "$FRESH" "$DENY_CONFIG" > "$WORK/fresh-deny.log" 2>&1
 status=$?
 set -e
 cat "$WORK/fresh-deny.log"
@@ -196,24 +193,14 @@ grep -Eiq 'too new|minimum age|minimum publish age' "$WORK/fresh-deny.log" || {
 }
 echo "publish_age_fresh_only_rejected=PASS"
 
-# Control C: allow is an explicit exception path. Once a fresh dependency is
-# recorded in Cargo.lock, deny must preserve that existing lockfile selection.
-(
-  cd "$WORK"
-  rustup run "$TOOLCHAIN" cargo -Zmin-publish-age check \
-    --manifest-path "$FRESH/Cargo.toml" \
-    --config "$ALLOW_CONFIG"
-)
+# Control C: an explicit allow resolution may enter Cargo.lock; deny --locked
+# then preserves that already-pinned version.
+cargo_check "$FRESH" "$ALLOW_CONFIG"
 grep -A2 '^name = "fresh-only"$' "$FRESH/Cargo.lock" | grep -F 'version = "0.1.0"' > /dev/null || {
   echo "FAIL: allow control did not lock the fresh version" >&2
   exit 1
 }
-(
-  cd "$WORK"
-  rustup run "$TOOLCHAIN" cargo -Zmin-publish-age check --locked \
-    --manifest-path "$FRESH/Cargo.toml" \
-    --config "$DENY_CONFIG"
-)
+cargo_check "$FRESH" "$DENY_CONFIG" --locked
 echo "publish_age_existing_lock_exception=PASS"
 
 {
