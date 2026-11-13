@@ -1,0 +1,71 @@
+name: Archived HDC example — supported target surface qualification
+
+on:
+  pull_request:
+    paths:
+      - "examples/hdc_cooperation.rs"
+      - "research/archived-examples/hdc_cooperation.rs"
+      - "docs/research/ARCHIVED_HDC_COOPERATION_EXPERIMENT.md"
+      - ".github/workflows/hdc-archive-target-qualification.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hdc-archive-target-qualification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  target-surface:
+    name: Supported targets on Rust ${{ matrix.toolchain }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ["1.99.1", "1.100.0"]
+    env:
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: Checkout exact PR merge tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Verify archive disposition is present in the checked-out tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e examples/hdc_cooperation.rs
+          test -f research/archived-examples/hdc_cooperation.rs
+          test -f docs/research/ARCHIVED_HDC_COOPERATION_EXPERIMENT.md
+          grep -q "ARCHIVED RESEARCH SOURCE" research/archived-examples/hdc_cooperation.rs
+          echo "HDC source preservation and non-executable disposition: PASS"
+
+      - name: Install exact Rust and Cargo toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install "${{ matrix.toolchain }}" --profile minimal
+          [[ "$(rustup run "${{ matrix.toolchain }}" rustc --version)" == "rustc ${{ matrix.toolchain }} "* ]]
+          [[ "$(rustup run "${{ matrix.toolchain }}" cargo --version)" == "cargo ${{ matrix.toolchain }} "* ]]
+          rustup run "${{ matrix.toolchain }}" rustc -Vv
+          rustup run "${{ matrix.toolchain }}" cargo -Vv
+
+      - name: Verify workspace metadata and locked graph
+        run: |
+          cargo +${{ matrix.toolchain }} metadata --locked --format-version 1 --no-deps > /dev/null
+          cargo +${{ matrix.toolchain }} fetch --locked
+
+      - name: Compile every supported target
+        run: cargo +${{ matrix.toolchain }} check --locked --all-targets
+
+      - name: Run library, integration and target tests
+        run: cargo +${{ matrix.toolchain }} test --locked --all-targets
+
+      - name: Enforce Cargo.lock immutability
+        run: git diff --exit-code -- Cargo.lock
