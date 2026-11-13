@@ -20,6 +20,7 @@ CARGO_VERSION="$(rustup run "$TOOLCHAIN" cargo --version)"
 }
 
 for edition in 2018 2021 2024; do
+  mkdir -p "$WORK/$edition"
   rustup run "$TOOLCHAIN" rustc \
     --edition="$edition" \
     --crate-type=lib \
