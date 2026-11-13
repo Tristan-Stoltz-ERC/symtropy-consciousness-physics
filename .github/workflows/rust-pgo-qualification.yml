@@ -4,6 +4,8 @@ on:
     paths:
       - "scripts/run-rust-pgo-instrumented.sh"
       - "scripts/run-rust-sample-pgo.sh"
+      - "scripts/seal-rust-pgo-evidence.sh"
+      - "scripts/verify-rust-pgo-evidence.sh"
       - "benchmarks/rust-pgo/**"
       - "docs/research/RUST_110_PGO_EVIDENCE_PASSPORT_V0_1.md"
       - ".github/workflows/rust-pgo-qualification.yml"
@@ -56,6 +58,8 @@ jobs:
           jq -e '.schema == "luminous.rust-pgo-evidence-passport.v0.1"' benchmarks/rust-pgo/protocol-v0.1.json
           bash -n scripts/run-rust-pgo-instrumented.sh
           bash -n scripts/run-rust-sample-pgo.sh
+          bash -n scripts/seal-rust-pgo-evidence.sh
+          bash -n scripts/verify-rust-pgo-evidence.sh
           grep -F -- '-Cprofile-generate' scripts/run-rust-pgo-instrumented.sh
           grep -F -- '-Cprofile-use' scripts/run-rust-pgo-instrumented.sh
           grep -F -- '-Cprofile-sample-use' scripts/run-rust-sample-pgo.sh
@@ -90,15 +94,14 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/run-rust-pgo-instrumented.sh
-      - name: Analyze paired results
+      - name: Verify sealed instrumentation-PGO evidence against exact source
         if: success()
-        env:
-          RUSTC_TOOLCHAIN: 1.100.0
+        shell: bash
         run: |
           set -euo pipefail
-          CSV="$(find "${{ runner.temp }}/symtropy-pgo" -name runtime.csv -print -quit)"
-          test -n "$CSV"
-          bash scripts/analyze-rust-toolchain-benchmark.sh "$CSV" no-pgo instrumentation-pgo
+          RESULT_DIR="$(find "${{ runner.temp }}/symtropy-pgo" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESULT_DIR"
+          bash scripts/verify-rust-pgo-evidence.sh "$RESULT_DIR" "$GITHUB_WORKSPACE"
       - name: Upload raw PGO profile and evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -143,16 +146,18 @@ jobs:
             exit 0
           fi
           if [[ $status -ne 0 ]]; then exit "$status"; fi
+          RESULT_DIR="$(find "$PGO_RESULT_ROOT" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESULT_DIR"
+          echo "result_dir=$RESULT_DIR" >> "$GITHUB_OUTPUT"
           echo "result=MECHANICAL_CHECKS_PASS" >> "$GITHUB_OUTPUT"
-      - name: Analyze sample-PGO paired results
+      - name: Verify sealed sample-PGO evidence against exact source
         if: steps.sample.outputs.result == 'MECHANICAL_CHECKS_PASS'
-        env:
-          RUSTC_TOOLCHAIN: 1.100.0
+        shell: bash
         run: |
           set -euo pipefail
-          CSV="$(find "${{ runner.temp }}/symtropy-sample-pgo" -name runtime.csv -print -quit)"
-          test -n "$CSV"
-          bash scripts/analyze-rust-toolchain-benchmark.sh "$CSV" no-pgo sample-pgo
+          RESULT_DIR="$(find "${{ runner.temp }}/symtropy-sample-pgo" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESULT_DIR"
+          bash scripts/verify-rust-pgo-evidence.sh "$RESULT_DIR" "$GITHUB_WORKSPACE"
       - name: Upload sample-PGO raw evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
