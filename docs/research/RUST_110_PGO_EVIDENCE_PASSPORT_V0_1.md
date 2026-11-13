@@ -35,18 +35,21 @@ Implemented pilot:
 - source commit, target, flags and Cargo.lock stay fixed;
 - training example defaults to `jphi_convergence`;
 - transfer probes default to `gradient_replacement` and `cooperation_decomposition`;
-- separate build target directories for no-PGO, instrumented and PGO builds;
-- build scripts do not receive the profiling flags because an explicit target is passed to Cargo;
-- two training executions are merged;
-- three or more matched runtime observations are retained by default;
-- repeated stdout must be deterministic within each variant and exactly equal across no-PGO/PGO before the script returns a mechanical pass;
-- raw binaries, profile data, logs and measurement CSV are retained outside the repository.
+- one instrumentation profile is generated from two complete training executions;
+- baseline and PGO builds are repeated in fresh target directories for each paired build trial;
+- baseline and PGO use the same `line-tables-only` debug-info setting; profiling flags are the only intended codegen treatment difference;
+- build order and runtime order alternate across trials to reduce thermal/order bias;
+- each independent build trial has repeated runtime observations, represented separately in the analyzer's build-trial and runtime-repeat columns;
+- the instrumented training executable, no-PGO executable and final PGO executable must preserve exact stdout and stderr digests;
+- build time, compiler peak RSS, target bytes, binary bytes and each raw output digest are retained outside the repository.
+
 
 The current examples are **different workloads**, not an IID split of one task. The first experiment is therefore an explicit cross-example profile-transfer probe. It cannot establish generalization to every workload. A future experiment should refactor the simulation runner into a parameterized common executable with disjoint training/holdout seed manifests before making stronger generalization claims.
 
 ### Sample-based PGO
 
-The application is built with DWARF line tables, run under Linux `perf` with branch-stack sampling, converted by `llvm-profgen`, and rebuilt with `-Cprofile-sample-use`.
+The application is built with DWARF line tables, run under Linux `perf` with branch-stack sampling, converted by `llvm-profgen`, and rebuilt with `-Cprofile-sample-use`. The sample profile is generated once, then no-PGO and sample-PGO binaries are built in fresh target directories for each paired build trial, using the same line-table flags and alternating build order. Runtime repeats are nested within the corresponding build trial. Perf's own stderr is not treated as application stderr: the training binary is re-run without perf to capture the workload's actual stdout/stderr identity.
+
 
 Implemented pilot:
 - `scripts/run-rust-sample-pgo.sh`
