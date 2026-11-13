@@ -82,8 +82,10 @@ llvm-profgen --binary="$TRAIN_BIN" --output="$PROFILE" --perfdata="$PERFDATA" \
     die "llvm-profgen could not convert perf data"
   }
 [[ -s "$PROFILE" ]] || die "sample profile is empty"
-TRAIN_OUT="$(sha256sum "$OUT/logs/perf-training.stdout" | awk '{print $1}')"
-TRAIN_ERR="$(sha256sum "$OUT/logs/perf-training.stderr" | awk '{print $1}')"
+# Capture the training program again without perf's own diagnostic text in stderr.
+"$TRAIN_BIN" > "$OUT/logs/training-check.stdout" 2> "$OUT/logs/training-check.stderr"
+TRAIN_OUT="$(sha256sum "$OUT/logs/training-check.stdout" | awk '{print $1}')"
+TRAIN_ERR="$(sha256sum "$OUT/logs/training-check.stderr" | awk '{print $1}')"
 
 build_example() {
   local variant="$1" target_dir="$2" rustflags="$3" log="$4"
