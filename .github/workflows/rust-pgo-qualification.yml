@@ -1,0 +1,170 @@
+name: Rust 1.100 PGO evidence qualification
+on:
+  pull_request:
+    paths:
+      - "scripts/run-rust-pgo-instrumented.sh"
+      - "scripts/run-rust-sample-pgo.sh"
+      - "scripts/seal-rust-pgo-evidence.sh"
+      - "scripts/verify-rust-pgo-evidence.sh"
+      - "benchmarks/rust-pgo/**"
+      - "docs/research/RUST_110_PGO_EVIDENCE_PASSPORT_V0_1.md"
+      - ".github/workflows/rust-pgo-qualification.yml"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: PGO method to qualify
+        type: choice
+        options: [instrumentation, sample]
+        default: instrumentation
+        required: true
+      train_example:
+        description: Frozen profile-training workload
+        type: choice
+        options: [jphi_convergence, gradient_replacement, cooperation_decomposition]
+        default: jphi_convergence
+        required: true
+      build_repeats:
+        description: Independent fresh-target paired build trials
+        type: choice
+        options: ["5", "10", "30"]
+        default: "5"
+        required: true
+      repeats:
+        description: Matched runtime repetitions within each build trial
+        type: choice
+        options: ["5", "10", "30"]
+        default: "5"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-100-pgo-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  static-contract:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Parse the protocol and validate shell syntax
+        run: |
+          set -euo pipefail
+          jq -e '.schema == "luminous.rust-pgo-evidence-passport.v0.1"' benchmarks/rust-pgo/protocol-v0.1.json
+          bash -n scripts/run-rust-pgo-instrumented.sh
+          bash -n scripts/run-rust-sample-pgo.sh
+          bash -n scripts/seal-rust-pgo-evidence.sh
+          bash -n scripts/verify-rust-pgo-evidence.sh
+          grep -F -- 'PASS_EVIDENCE_INTEGRITY_ONLY' scripts/verify-rust-pgo-evidence.sh
+          grep -F -- 'evidence-files.sha256' scripts/seal-rust-pgo-evidence.sh
+          grep -F -- '-Cprofile-generate' scripts/run-rust-pgo-instrumented.sh
+          grep -F -- '-Cprofile-use' scripts/run-rust-pgo-instrumented.sh
+          grep -F -- '-Cprofile-sample-use' scripts/run-rust-sample-pgo.sh
+
+  instrumentation-pgo:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'instrumentation'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact Rust/Cargo and LLVM profile tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup component add llvm-tools-preview --toolchain 1.100.0
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+          rustup run 1.100.0 rustc -Vv
+          rustup run 1.100.0 cargo -Vv
+      - name: Run the exact-source instrumentation PGO tournament
+        id: pgo
+        env:
+          RUST_TOOLCHAIN: 1.100.0
+          PGO_TRAIN_EXAMPLE: ${{ inputs.train_example }}
+          PGO_BUILD_REPEATS: ${{ inputs.build_repeats }}
+          PGO_RUN_REPEATS: ${{ inputs.repeats }}
+          PGO_RESULT_ROOT: ${{ runner.temp }}/symtropy-pgo
+        run: |
+          set -euo pipefail
+          bash scripts/run-rust-pgo-instrumented.sh
+      - name: Verify sealed instrumentation-PGO evidence against exact source
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULT_DIR="$(find "${{ runner.temp }}/symtropy-pgo" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESULT_DIR"
+          bash scripts/verify-rust-pgo-evidence.sh "$RESULT_DIR" "$GITHUB_WORKSPACE"
+      - name: Upload raw PGO profile and evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rust-1.100-instrumentation-pgo-${{ github.sha }}
+          path: ${{ runner.temp }}/symtropy-pgo/
+          if-no-files-found: warn
+          retention-days: 30
+
+  sample-pgo:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'sample'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact stable toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+      - name: Probe sample-PGO hardware/software capability
+        id: sample
+        shell: bash
+        env:
+          RUST_TOOLCHAIN: 1.100.0
+          PGO_SAMPLE_EXAMPLE: ${{ inputs.train_example }}
+          PGO_BUILD_REPEATS: ${{ inputs.build_repeats }}
+          PGO_RUN_REPEATS: ${{ inputs.repeats }}
+          PGO_RESULT_ROOT: ${{ runner.temp }}/symtropy-sample-pgo
+        run: |
+          set +e
+          bash scripts/run-rust-sample-pgo.sh
+          status=$?
+          set -e
+          if [[ $status -eq 3 ]]; then
+            echo "result=NOT_EVALUABLE" >> "$GITHUB_OUTPUT"
+            echo "NOT_EVALUABLE: hardware perf/llvm-profgen prerequisites unavailable; no sample-PGO pass is claimed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ $status -ne 0 ]]; then exit "$status"; fi
+          RESULT_DIR="$(find "$PGO_RESULT_ROOT" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESULT_DIR"
+          echo "result_dir=$RESULT_DIR" >> "$GITHUB_OUTPUT"
+          echo "result=MECHANICAL_CHECKS_PASS" >> "$GITHUB_OUTPUT"
+      - name: Verify sealed sample-PGO evidence against exact source
+        if: steps.sample.outputs.result == 'MECHANICAL_CHECKS_PASS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULT_DIR="$(find "${{ runner.temp }}/symtropy-sample-pgo" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESULT_DIR"
+          bash scripts/verify-rust-pgo-evidence.sh "$RESULT_DIR" "$GITHUB_WORKSPACE"
+      - name: Upload sample-PGO raw evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rust-1.100-sample-pgo-${{ github.sha }}
+          path: ${{ runner.temp }}/symtropy-sample-pgo/
+          if-no-files-found: warn
+          retention-days: 30

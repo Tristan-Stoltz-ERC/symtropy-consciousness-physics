@@ -64,7 +64,13 @@ Use upstream `rustc-perf` for compiler-wide comparison and Cargo `--timings` to 
 
 ## Next frontier: PGO
 
-Rust 1.100 stabilizes `-Cprofile-sample-use`. The PGO experiment should compare non-PGO, instrumentation-PGO and sample-PGO on a frozen training corpus and held-out validation scenarios. Bind every profile to its source/compiler/flags/target digests. Reject PGO configurations that overfit the training corpus or change scientific outcomes. See the qualification report for the full protocol.
+Rust 1.100 stabilizes `-Cprofile-sample-use`. A separate research branch now contains two opt-in PGO pilots and an evidence passport:
+
+- `scripts/run-rust-pgo-instrumented.sh`: exact-source `profile-generate` → `llvm-profdata` → `profile-use`, with no-PGO versus PGO paired runtime measurements.
+- `scripts/run-rust-sample-pgo.sh`: Linux `perf` branch-stack collection → `llvm-profgen` → `profile-sample-use`; this requires a PMU-capable host and an LLVM-matched `llvm-profgen`.
+- `docs/research/RUST_110_PGO_EVIDENCE_PASSPORT_V0_1.md`: profile provenance, cross-example transfer probes, correctness gates and proposed acceptance thresholds.
+
+The first training workload is `jphi_convergence`; `gradient_replacement` and `cooperation_decomposition` are explicitly treated as cross-example transfer probes, not an IID hold-out set. No PGO speedup or scientific result is claimed until the physical workload tournament runs.
 
 ## Statistical interpretation
 
