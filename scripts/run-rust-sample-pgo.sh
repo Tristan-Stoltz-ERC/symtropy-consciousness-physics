@@ -211,6 +211,7 @@ RUSTC_TOOLCHAIN="$TOOLCHAIN" bash scripts/analyze-rust-toolchain-benchmark.sh \
   echo "schema=luminous.rust-pgo-sample.v0.3"
   echo "source_commit=$COMMIT"
   echo "source_tree=$SOURCE_TREE"
+  echo "toolchain=$TOOLCHAIN"
   echo "cargo_lock_sha256=$LOCK_BEFORE"
   echo "cargo_lock_sha256_after=$LOCK_AFTER"
   echo "cargo_metadata_sha256=$CARGO_METADATA_SHA"
