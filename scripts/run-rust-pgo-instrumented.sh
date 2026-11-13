@@ -71,8 +71,8 @@ rustup run "$TOOLCHAIN" cargo fetch --locked
 rustup run "$TOOLCHAIN" cargo metadata --locked --format-version 1 --no-deps > "$OUT/metadata/cargo-metadata.json"
 CARGO_METADATA_SHA="$(sha256sum "$OUT/metadata/cargo-metadata.json" | awk '{print $1}')"
 
-declare -A BASE_BUILD_MS BASE_BUILD_RSS BASE_BINARY BASE_BYTES
-declare -A PGO_BUILD_MS PGO_BUILD_RSS PGO_BINARY PGO_BYTES
+declare -A BASE_BUILD_MS BASE_BUILD_RSS BASE_BINARY BASE_BINARY_SHA BASE_BYTES
+declare -A PGO_BUILD_MS PGO_BUILD_RSS PGO_BINARY PGO_BINARY_SHA PGO_BYTES
 declare -A BASE_DIGEST PGO_DIGEST
 
 build_example() {
