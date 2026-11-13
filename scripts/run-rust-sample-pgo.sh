@@ -55,7 +55,7 @@ rustup run "$TOOLCHAIN" cargo fetch --locked
 # The training binary includes source line tables so perf samples can be
 # symbolized back to LLVM IR/code regions.
 set +e
-env -u RUSTC_WRAPPER -u RUSTC_WORKSPACE_WRAPPER \
+env -u RUSTC_WRAPPER -u RUSTC_WORKSPACE_WRAPPER -u CARGO_ENCODED_RUSTFLAGS \
   CARGO_TARGET_DIR="$BASE_TARGET" RUSTFLAGS="-Cdebuginfo=line-tables-only" \
   rustup run "$TOOLCHAIN" cargo build --release --locked --offline \
     --target "$HOST" --example "$EXAMPLE" > "$OUT/logs/sample-profile-build.log" 2>&1
@@ -87,7 +87,7 @@ llvm-profgen --binary="$BIN" --output="$PROFILE" --perfdata="$PERFDATA" \
 
 # Rebuild from the same source, compiler, target and line-table debug settings.
 set +e
-env -u RUSTC_WRAPPER -u RUSTC_WORKSPACE_WRAPPER \
+env -u RUSTC_WRAPPER -u RUSTC_WORKSPACE_WRAPPER -u CARGO_ENCODED_RUSTFLAGS \
   CARGO_TARGET_DIR="$SAMPLE_TARGET" \
   RUSTFLAGS="-Cdebuginfo=line-tables-only -Cprofile-sample-use=$PROFILE -Cllvm-args=-pgo-warn-missing-function" \
   rustup run "$TOOLCHAIN" cargo build --release --locked --offline \
