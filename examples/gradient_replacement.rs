@@ -24,9 +24,7 @@
 
 use nalgebra::SVector;
 use symthaea_consciousness_equation::ConsciousnessInputs;
-use symtropy_consciousness_physics::event_rng::{
-    registry, EventAddress, SubjectId,
-};
+use symtropy_consciousness_physics::event_rng::{registry, EventAddress, SubjectId};
 use symtropy_consciousness_physics::experiment_seed::ExperimentSeedSchedule;
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
@@ -108,8 +106,7 @@ fn random_walk_uniform(
         RandomWalkRngMode::EventAddressed => {
             let stable_id = u32::try_from(agent_index + 1)
                 .expect("agent index must fit the nonzero u32 subject ID");
-            let subject = SubjectId::agent(stable_id)
-                .expect("one-based agent identity is nonzero");
+            let subject = SubjectId::agent(stable_id).expect("one-based agent identity is nonzero");
             EventAddress::new(
                 replicate_seed,
                 GRADIENT_REPLACEMENT_NAMESPACE,
@@ -334,13 +331,7 @@ fn run_experiment(ctrl: Controller, seed: u64, rng_mode: RandomWalkRngMode) -> R
                 }
 
                 Controller::RandomWalk => {
-                    let uniform = random_walk_uniform(
-                        rng_mode,
-                        seed,
-                        tick as u64,
-                        idx,
-                        &mut rng,
-                    );
+                    let uniform = random_walk_uniform(rng_mode, seed, tick as u64, idx, &mut rng);
                     let angle = uniform * std::f64::consts::TAU;
                     SVector::from([angle.cos() * 20.0, angle.sin() * 20.0])
                 }
@@ -729,12 +720,10 @@ mod event_random_walk_tests {
     fn event_addressed_random_walk_is_repeatable_for_seed_agent_and_tick() {
         let mut legacy_a = 42;
         let mut legacy_b = 42;
-        let first = random_walk_uniform(
-            RandomWalkRngMode::EventAddressed, 42, 17, 3, &mut legacy_a
-        );
-        let second = random_walk_uniform(
-            RandomWalkRngMode::EventAddressed, 42, 17, 3, &mut legacy_b
-        );
+        let first =
+            random_walk_uniform(RandomWalkRngMode::EventAddressed, 42, 17, 3, &mut legacy_a);
+        let second =
+            random_walk_uniform(RandomWalkRngMode::EventAddressed, 42, 17, 3, &mut legacy_b);
         assert_eq!(first.to_bits(), second.to_bits());
         assert_eq!(legacy_a, 42);
         assert_eq!(legacy_b, 42);
@@ -782,9 +771,8 @@ mod event_random_walk_tests {
     fn legacy_random_walk_still_consumes_the_historical_lcg_stream() {
         let mut actual_state = 42;
         let mut expected_state = 42;
-        let actual = random_walk_uniform(
-            RandomWalkRngMode::LegacyLcg, 42, 17, 3, &mut actual_state
-        );
+        let actual =
+            random_walk_uniform(RandomWalkRngMode::LegacyLcg, 42, 17, 3, &mut actual_state);
         let expected = rng_f64(&mut expected_state);
         assert_eq!(actual.to_bits(), expected.to_bits());
         assert_eq!(actual_state, expected_state);
@@ -807,4 +795,3 @@ mod event_random_walk_tests {
         assert!(RandomWalkRngMode::parse(Some("anything-else")).is_err());
     }
 }
-
