@@ -9,8 +9,10 @@ on:
       - "examples/event_rng_crn_variance.rs"
       - "docs/research/EVENT_KEYED_RNG_IMPLEMENTATION_V0_1.md"
       - "docs/research/EVENT_RNG_CRN_VARIANCE_BENCHMARK_V0_1.md"
+      - "docs/research/EVENT_IDENTITY_AND_LINEAGE_POLICY_V0_1.md"
       - "benchmarks/event-rng/implementation-contract-v0.1.json"
       - "benchmarks/event-rng/crn-variance-contract-v0.1.json"
+      - "benchmarks/event-rng/event-identity-lineage-contract-v0.1.json"
       - ".github/workflows/event-keyed-rng-qualification.yml"
 
 permissions:
@@ -35,6 +37,8 @@ jobs:
             benchmarks/event-rng/implementation-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.crn-variance-benchmark.v0.1"' \
             benchmarks/event-rng/crn-variance-contract-v0.1.json
+          jq -e '.schema == "luminous.symtropy.event-identity-lineage-policy.v0.1"' \
+            benchmarks/event-rng/event-identity-lineage-contract-v0.1.json
           grep -F 'pub const EVENT_KEY_SCHEMA_VERSION: u32 = 1;' src/event_rng.rs
           grep -F 'pub const EVENT_RNG_ALGORITHM: &str = "philox4x64-10";' src/event_rng.rs
           grep -F 'philox4x64_10_matches_random123_mixed_known_answer_vector' src/event_rng.rs
