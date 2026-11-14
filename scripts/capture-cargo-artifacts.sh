@@ -30,6 +30,10 @@ if [[ -n "$(git -C "$ROOT" status --porcelain --untracked-files=all)" ]]; then
   exit 1
 fi
 
+if [[ -d "$OUTPUT" ]] && [[ -n "$(find "$OUTPUT" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+  echo "output directory must be empty so no stale build artifacts can be reused" >&2
+  exit 2
+fi
 mkdir -p "$OUTPUT"
 OUTPUT="$(realpath "$OUTPUT")"
 case "$OUTPUT/" in "$ROOT/"*) echo "output must be outside source worktree" >&2; exit 2 ;; esac
