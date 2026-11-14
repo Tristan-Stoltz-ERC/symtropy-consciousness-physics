@@ -325,12 +325,14 @@ jobs:
             --bootstrap-replicates 1000 \
             --equivalence-margin 5 \
             --margin-rationale synthetic-preregistered-contract \
+            --input-sha256 "$(sha256sum "$temp_dir/cooperation.csv" | cut -d ' ' -f 1)" \
             > "$temp_dir/receipt.json"
           jq -e '
             .schema == "luminous.symtropy.paired-analysis-receipt.v0.1" and
             .status == "analysis_only_not_historical_verdict" and
             .n == 2 and
             .seed_ids == [100, 200] and
+            (.input_sha256 | length) == 64 and
             .paired_summary.mean_difference == 3 and
             .sign_flip.exact == true and
             .equivalence_screen.status == "equivalent_within_margin"
