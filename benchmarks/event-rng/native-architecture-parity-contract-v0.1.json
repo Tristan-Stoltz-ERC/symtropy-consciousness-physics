@@ -1,0 +1,35 @@
+{
+  "schema": "luminous.symtropy.event-rng-native-architecture-parity.v0.1",
+  "status": "native_x86_64_aarch64_fixed_vector_qualification",
+  "common_toolchain": "1.100.0",
+  "architectures": [
+    {"runner":"ubuntu-24.04","architecture":"x86_64"},
+    {"runner":"ubuntu-24.04-arm","architecture":"aarch64"}
+  ],
+  "also_checked_on_x86_64_toolchains":["1.99.1","1.100.0","1.101.0-beta.1"],
+  "fixture": {
+    "path":"tests/reference/event-rng-portability-v1.txt",
+    "sha256":"689b33b045ff3de243b8d5e05027bde0be660730af0842562187839a5d81b5ab",
+    "byte_for_byte_comparison":true
+  },
+  "fixture_coverage": [
+    "philox4x64_10_zero_known_answer",
+    "philox4x64_10_mixed_known_answer",
+    "fixed_event_address_block",
+    "open_uniform_binary64_bits",
+    "canonical_dynamic_birth_subject_id",
+    "canonical_lineage_receipt_bytes"
+  ],
+  "execution": {
+    "native_arm64":true,
+    "qemu_substitute":false,
+    "cross_compilation_substitute":false
+  },
+  "nonclaims": [
+    "not_exhaustive_over_all_inputs",
+    "no_gpu_portability_claim",
+    "no_application_numerical_equivalence_claim",
+    "no_performance_claim",
+    "no_all_target_or_all_compiler_versions_claim"
+  ]
+}

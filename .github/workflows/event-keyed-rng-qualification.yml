@@ -13,6 +13,8 @@ on:
       - "examples/event_rng_crn_variance.rs"
       - "examples/event_rng_throughput.rs"
       - "examples/event_rng_reference_corpus.rs"
+      - "examples/event_rng_portability_vectors.rs"
+      - "tests/reference/event-rng-portability-v1.txt"
       - "tests/reference/philox4x64_random123.cpp"
       - "scripts/test-philox-random123-parity.sh"
       - "Cargo.toml"
@@ -23,6 +25,7 @@ on:
       - "docs/research/EVENT_IDENTITY_CLAIM_AUDIT_V0_1.md"
       - "docs/research/EVENT_DYNAMIC_ENTITY_LINEAGE_V0_1.md"
       - "docs/research/DYNAMIC_ENTITY_LINEAGE_RECEIPTS_V0_1.md"
+      - "docs/research/EVENT_RNG_NATIVE_ARM64_PARITY_V0_1.md"
       - "docs/research/EVENT_RNG_THROUGHPUT_BENCHMARK_V0_1.md"
       - "docs/research/EVENT_RNG_RANDOM123_REFERENCE_PARITY_V0_1.md"
       - "benchmarks/event-rng/implementation-contract-v0.1.json"
@@ -32,6 +35,7 @@ on:
       - "benchmarks/event-rng/event-identity-claim-contract-v0.1.json"
       - "benchmarks/event-rng/dynamic-entity-lineage-contract-v0.1.json"
       - "benchmarks/event-rng/lineage-receipt-contract-v0.1.json"
+      - "benchmarks/event-rng/native-architecture-parity-contract-v0.1.json"
       - "benchmarks/event-rng/throughput-contract-v0.1.json"
       - "benchmarks/event-rng/reference-parity-contract-v0.1.json"
       - ".github/workflows/event-keyed-rng-qualification.yml"
@@ -68,6 +72,9 @@ jobs:
             benchmarks/event-rng/dynamic-entity-lineage-contract-v0.1.json
           jq -e '.schema == "luminous.dynamic-entity-lineage-receipt.v1"' \
             benchmarks/event-rng/lineage-receipt-contract-v0.1.json
+          jq -e '.schema == "luminous.symtropy.event-rng-native-architecture-parity.v0.1"' \
+            benchmarks/event-rng/native-architecture-parity-contract-v0.1.json
+          grep -F 'schema=luminous.symtropy.event-rng-portability.v1' tests/reference/event-rng-portability-v1.txt
           grep -F 'receipt_round_trips_to_one_canonical_byte_representation' src/event_lineage_receipt.rs
           jq -e '.schema == "luminous.symtropy.event-rng-throughput.v0.1"' \
             benchmarks/event-rng/throughput-contract-v0.1.json
@@ -107,7 +114,15 @@ jobs:
       - name: Format RNG module and CRN benchmark
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
-        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
+        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs examples/event_rng_portability_vectors.rs
+      - name: Verify architecture-independent portability bytes
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: |
+          set -euo pipefail
+          rustup run "$RUST_TOOLCHAIN" cargo run --locked --example event_rng_portability_vectors > "$RUNNER_TEMP/event-rng-portability.txt"
+          cmp --silent tests/reference/event-rng-portability-v1.txt "$RUNNER_TEMP/event-rng-portability.txt"
+          sha256sum "$RUNNER_TEMP/event-rng-portability.txt"
       - name: Run reference vectors and event-address adversarial tests
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
@@ -140,5 +155,45 @@ jobs:
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
         run: cargo +"$RUST_TOOLCHAIN" check --locked --lib
+      - name: Preserve dependency graph
+        run: git diff --exit-code -- Cargo.lock
+
+
+  native-aarch64-portability:
+    name: Native AArch64 portability (Rust 1.100.0)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact stable compiler and verify native architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal --component rustfmt
+          [[ "$(uname -m)" == "aarch64" ]]
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+          rustup run 1.100.0 rustc -Vv
+      - name: Verify byte-for-byte portability corpus natively on AArch64
+        run: |
+          set -euo pipefail
+          rustup run 1.100.0 cargo run --locked --example event_rng_portability_vectors > "$RUNNER_TEMP/event-rng-portability.txt"
+          cmp --silent tests/reference/event-rng-portability-v1.txt "$RUNNER_TEMP/event-rng-portability.txt"
+          sha256sum "$RUNNER_TEMP/event-rng-portability.txt"
+      - name: Run Philox reference tests on AArch64
+        run: cargo +1.100.0 test --locked --lib event_rng::tests
+      - name: Run dynamic lineage and receipt tests on AArch64
+        run: |
+          set -euo pipefail
+          cargo +1.100.0 test --locked --lib event_lineage::tests
+          cargo +1.100.0 test --locked --lib event_lineage_receipt::tests
+      - name: Run semantic identity and alignment tests on AArch64
+        run: |
+          set -euo pipefail
+          cargo +1.100.0 test --locked --lib event_identity::tests
+          cargo +1.100.0 test --locked --lib event_alignment::tests
       - name: Preserve dependency graph
         run: git diff --exit-code -- Cargo.lock
