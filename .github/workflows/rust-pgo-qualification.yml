@@ -267,12 +267,15 @@ jobs:
         run: |
           set -euo pipefail
           rustup toolchain install 1.100.0 --profile minimal --component rustfmt
-          rustc +1.100.0 --version | grep -F "rustc 1.100.0"
-          cargo +1.100.0 --version | grep -F "cargo 1.100.0"
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+      - name: Verify Rust 1.99.1 tolerates global Cargo 1.100 policy
+        shell: bash
+        run: |
+          set -euo pipefail
           rustup toolchain install 1.99.1 --profile minimal
           temp_cargo_home="$(mktemp -d)"
           trap 'rm -rf "$temp_cargo_home"' EXIT
-          mkdir -p "$temp_cargo_home"
           cat > "$temp_cargo_home/config.toml" <<'CARGO_CONFIG'
           [resolver]
           incompatible-publish-age = "deny"
@@ -281,12 +284,6 @@ jobs:
           global-min-publish-age = "14 days"
           CARGO_CONFIG
           CARGO_HOME="$temp_cargo_home" cargo +1.99.1 metadata --format-version 1 --locked --no-deps > /dev/null
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup toolchain install 1.100.0 --profile minimal --component rustfmt
-          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
-          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
       - name: Format the seed schedule and selectable experiment programs
         run: |
           set -euo pipefail
