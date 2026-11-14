@@ -72,7 +72,7 @@ jobs:
           jq -e '.schema == "luminous.symtropy.crn-crossfit-coupling.v0.1"' \
             benchmarks/event-rng/crn-crossfit-coupling-contract-v0.1.json
           grep -F 'holdout_used_for_selection' benchmarks/event-rng/crn-crossfit-coupling-contract-v0.1.json
-          grep -F 'TRAIN_SELECTED_POLICY' examples/event_rng_crn_crossfit.rs
+          grep -F 'selected_policy' examples/event_rng_crn_crossfit.rs
           jq -e '.schema == "luminous.symtropy.event-identity-lineage-policy.v0.1"' \
             benchmarks/event-rng/event-identity-lineage-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.event-keyed-rng-sota-qualification.v0.1"' \
