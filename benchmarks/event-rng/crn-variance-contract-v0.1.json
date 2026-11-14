@@ -1,0 +1,43 @@
+{
+  "schema": "luminous.symtropy.crn-variance-benchmark.v0.1",
+  "status": "deterministic_analytical_software_fixture",
+  "model": {
+    "exogenous": "U ~ Uniform(0,1)",
+    "control": "Y0 = U^2",
+    "treatment": "Y1 = U^2 + 0.25 + beta*U",
+    "average_treatment_effect": "0.25 + beta/2"
+  },
+  "design": {
+    "subjects_per_replicate": 2048,
+    "independent_outer_replicates": 512,
+    "bootstrap_resamples": 2000,
+    "bootstrap_unit": "outer_replicate_pair",
+    "bootstrap_seeded": true
+  },
+  "cases": {
+    "positive_covariance": {
+      "beta": 0.5,
+      "known_ate": 0.5,
+      "theoretical_matched_to_independent_variance_ratio_approx": 0.07391,
+      "software_gate": "empirical_ratio < 0.20"
+    },
+    "negative_covariance_control": {
+      "beta": -1.5,
+      "known_ate": -0.5,
+      "software_gate": "empirical_ratio > 1.20",
+      "purpose": "demonstrate_CRN_can_increase_variance"
+    }
+  },
+  "required": [
+    "both_estimators_recover_known_ATE_with_absolute_error_below_0.01",
+    "positive_covariance_case_CRN_variance_ratio_below_0.20",
+    "negative_covariance_case_CRN_variance_ratio_above_1.20"
+  ],
+  "nonclaims": [
+    "not_a_real_symtropy_experiment",
+    "not_a_TestU01_BigCrush_or_PractRand_qualification",
+    "not_a_validation_of_real_model_event_semantics",
+    "not_a_universal_claim_that_CRN_reduces_variance",
+    "no_historical_outputs_changed"
+  ]
+}
