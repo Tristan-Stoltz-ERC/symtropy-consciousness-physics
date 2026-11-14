@@ -6,7 +6,7 @@ The passport extends Cargo's JSON artifact capture into a content-addressed evid
 
 The builder verifies the exact requested rustc and Cargo versions, warms the locked dependency graph with `cargo fetch --locked`, then runs `cargo build --locked --all-targets --offline` with a fresh dedicated target directory and Cargo 1.100's separate build directory configured through `CARGO_BUILD_BUILD_DIR`. Rustc wrappers are explicitly disabled for this capture lane.
 
-Only Cargo `compiler-artifact` JSON messages are used to discover final artifacts. The implementation does not scan or guess private Cargo build-directory paths. Every Cargo-reported filename is resolved and required to remain under the isolated target directory.
+Only Cargo `compiler-artifact` JSON messages are used to discover compiler artifacts. Cargo may report a file under either the target directory or the separate build directory (for example, a build-script output); such a file is recorded only because Cargo explicitly named it. The implementation never scans, enumerates, or guesses the private build-directory layout. Every reported filename is resolved and required to remain under one of the two isolated Cargo output roots.
 
 ## Identity recorded
 
