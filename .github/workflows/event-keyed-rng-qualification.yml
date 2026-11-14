@@ -13,6 +13,7 @@ on:
       - "examples/event_rng_crn_variance.rs"
       - "examples/event_rng_throughput.rs"
       - "examples/event_rng_reference_corpus.rs"
+      - "examples/phi_ablation.rs"
       - "tests/reference/philox4x64_random123.cpp"
       - "scripts/test-philox-random123-parity.sh"
       - "Cargo.toml"
@@ -107,7 +108,11 @@ jobs:
       - name: Format RNG module and CRN benchmark
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
-        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
+        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs examples/phi_ablation.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
+      - name: Test replicate-keyed Phi ablation random control
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" test --locked --example phi_ablation
       - name: Run reference vectors and event-address adversarial tests
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
