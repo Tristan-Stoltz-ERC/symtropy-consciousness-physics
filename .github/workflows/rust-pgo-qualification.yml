@@ -5,6 +5,7 @@ on:
       - "scripts/run-rust-pgo-instrumented.sh"
       - "scripts/run-rust-pgo-seed-holdout.sh"
       - "src/experiment_seed.rs"
+      - "src/paired_inference.rs"
       - "src/lib.rs"
       - "examples/jphi_convergence.rs"
       - "examples/gradient_replacement.rs"
@@ -83,6 +84,8 @@ jobs:
           bash -n scripts/run-rust-sample-pgo.sh
           grep -F 'pub const DEFAULT_SEED_BASE: u64 = 42;' src/experiment_seed.rs
           grep -F 'pub const DEFAULT_SEED_STRIDE: u64 = 997;' src/experiment_seed.rs
+          grep -F 'pub mod paired_inference;' src/lib.rs
+          jq -e '.schema == "luminous.symtropy.paired-inference.v0.1"' benchmarks/paired-inference/contract-v0.1.json
           grep -F 'default_schedule_preserves_historical_seed_values' src/experiment_seed.rs
           grep -F 'for &seed in seed_schedule.seeds()' examples/jphi_convergence.rs
           grep -F 'for &seed in seed_schedule.seeds()' examples/gradient_replacement.rs
@@ -268,11 +271,14 @@ jobs:
           set -euo pipefail
           rustup run 1.100.0 rustfmt --edition 2021 --check \
             src/experiment_seed.rs \
+            src/paired_inference.rs \
             examples/jphi_convergence.rs \
             examples/gradient_replacement.rs \
             examples/cooperation_decomposition.rs
       - name: Run the default and disjoint-index seed schedule unit tests
         run: cargo +1.100.0 test --locked --lib experiment_seed::tests
+      - name: Run seed-keyed paired inference adversarial tests
+        run: cargo +1.100.0 test --locked --lib paired_inference::tests
       - name: Compile all three supported seed-selectable experiment examples
         run: |
           cargo +1.100.0 check --locked --example jphi_convergence
