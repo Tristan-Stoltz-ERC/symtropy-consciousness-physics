@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Emits deterministic little-endian Philox words for external statistical suites.
@@ -35,7 +34,9 @@ impl StreamMode {
         match value {
             "raw" => Ok(Self::Raw),
             "event" => Ok(Self::EventAddressed),
-            other => Err(format!("unknown stream mode {other:?}; expected raw or event")),
+            other => Err(format!(
+                "unknown stream mode {other:?}; expected raw or event"
+            )),
         }
     }
 
@@ -61,8 +62,8 @@ fn raw_block(index: u64, seed: u64, namespace: u64) -> [u64; 4] {
 }
 
 fn event_block(index: u64, seed: u64, namespace: u64) -> [u64; 4] {
-    let agent_id = u32::try_from(index + 1)
-        .expect("event stream block count must not exceed u32::MAX");
+    let agent_id =
+        u32::try_from(index + 1).expect("event stream block count must not exceed u32::MAX");
     let event_kind_tag = (index % 3 + 1) as u16;
     let purpose_tag = (index % 4 + 1) as u16;
     let event_kind = EventKind::new(event_kind_tag).expect("event kind tag is nonzero");
@@ -132,7 +133,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     eprintln!("mode={}", mode.label());
     eprintln!("blocks={blocks}");
     eprintln!("words={}", blocks * WORDS_PER_BLOCK as u64);
-    eprintln!("bytes={}", blocks * WORDS_PER_BLOCK as u64 * BYTES_PER_WORD as u64);
+    eprintln!(
+        "bytes={}",
+        blocks * WORDS_PER_BLOCK as u64 * BYTES_PER_WORD as u64
+    );
     eprintln!("seed={seed:#018x}");
     eprintln!("experiment_namespace={namespace:#018x}");
     eprintln!("serialization=little_endian_u64");
