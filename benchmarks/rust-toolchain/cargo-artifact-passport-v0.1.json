@@ -1,0 +1,12 @@
+{
+  "schema":"luminous.cargo-artifact-passport.v0.1",
+  "status":"content_integrity_and_provenance_receipt",
+  "artifact_discovery":"cargo_json_compiler_artifact_messages_only",
+  "private_build_layout_inspection":false,
+  "source_identity":["git_commit","git_tree","manifest_sha256","cargo_lock_sha256"],
+  "toolchain_identity":["rustc_verbose_version","rustc_commit_hash","cargo_verbose_version","target_triple"],
+  "artifact_identity":["package_id","target","profile","relative_path_under_target_dir","sha256","size_bytes"],
+  "integrity_verifier":["passport_sha256","raw_cargo_messages_sha256","compiler_artifact_manifest_sha256","each_artifact_sha256_and_size","source_git_identity","Cargo_lock_sha256","manifest_sha256"],
+  "negative_controls":["artifact_mutation_rejected","Cargo_lock_mutation_rejected"],
+  "nonclaims":["no_cache_reuse_claim","no_independent_reproducible_build_claim","no_builder_signature_claim","no_private_intermediate_file_validation"]
+}
