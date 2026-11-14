@@ -21,6 +21,7 @@ use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants}
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
 use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::experiment_seed::ExperimentSeedSchedule;
 
 const AGENTS: usize = 12;
 const MAX_TICKS: usize = 10_000;
@@ -286,8 +287,16 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 }
 
 fn main() {
+    let seed_schedule = match ExperimentSeedSchedule::from_env(NUM_SEEDS) {
+        Ok(schedule) => schedule,
+        Err(error) => {
+            eprintln!("Invalid experiment seed schedule: {error}");
+            std::process::exit(2);
+        }
+    };
+    eprintln!("Seed schedule: {}", seed_schedule.describe());
     eprintln!("=== J/Phi Convergence Experiment ===");
-    eprintln!("Agents: {AGENTS}, MaxTicks: {MAX_TICKS}, Seeds: {NUM_SEEDS}");
+    eprintln!("Agents: {AGENTS}, MaxTicks: {MAX_TICKS}, Seeds: {}", seed_schedule.len());
     eprintln!("Window: {CONVERGENCE_WINDOW}, Threshold: {CONVERGENCE_THRESHOLD}");
 
     // CSV header
@@ -297,8 +306,7 @@ fn main() {
 
     for condition in &conditions {
         let mut results = Vec::new();
-        for s in 0..NUM_SEEDS {
-            let seed = 42 + s as u64 * 997;
+        for &seed in seed_schedule.seeds() {
             eprintln!("  Running {} seed={seed}...", condition.name());
             results.push(run_experiment(*condition, seed));
         }
@@ -334,8 +342,7 @@ fn main() {
     let mut free_cluster = Vec::new();
     let mut energy_cluster = Vec::new();
 
-    for s in 0..NUM_SEEDS {
-        let seed = 42 + s as u64 * 997;
+    for &seed in seed_schedule.seeds() {
         let r_full = run_experiment(Condition::Full, seed);
         let r_free = run_experiment(Condition::Free, seed);
         let r_energy = run_experiment(Condition::EnergyOnly, seed);
