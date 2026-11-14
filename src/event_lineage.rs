@@ -40,9 +40,7 @@ pub enum BirthKeyError {
 impl fmt::Display for BirthKeyError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ZeroWorldNamespace => {
-                formatter.write_str("world namespace zero is reserved")
-            }
+            Self::ZeroWorldNamespace => formatter.write_str("world namespace zero is reserved"),
             Self::DuplicateParentSubject { subject_id } => write!(
                 formatter,
                 "birth key contains duplicate parent subject ID {subject_id}"
@@ -123,10 +121,7 @@ impl BirthKey {
         // Fold sorted parents in order. The previous state is mixed into every
         // next counter, so both parent-set membership and order are represented.
         for parent_id in &self.parent_subject_ids {
-            state = philox4x64_10(
-                [*parent_id, state[0], state[1], state[2]],
-                key,
-            );
+            state = philox4x64_10([*parent_id, state[0], state[1], state[2]], key);
         }
 
         // Set the high marker bit to distinguish this derivation family in
@@ -157,8 +152,12 @@ pub struct LineageIdRegistry {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LineageIdentityError {
-    StaticSubjectConflictsWithDerived { subject_id: u64 },
-    DerivedSubjectConflictsWithStatic { subject_id: u64 },
+    StaticSubjectConflictsWithDerived {
+        subject_id: u64,
+    },
+    DerivedSubjectConflictsWithStatic {
+        subject_id: u64,
+    },
     DerivedSubjectCollision {
         subject_id: u64,
         first_birth: BirthKey,
@@ -184,8 +183,7 @@ impl fmt::Display for LineageIdentityError {
             } => write!(
                 formatter,
                 "distinct birth keys {:?} and {:?} collide on subject ID {subject_id}",
-                first_birth,
-                second_birth
+                first_birth, second_birth
             ),
         }
     }
@@ -204,19 +202,14 @@ impl LineageIdRegistry {
     ) -> Result<(), LineageIdentityError> {
         let subject_id = subject.raw();
         if self.birth_keys_by_subject.contains_key(&subject_id) {
-            return Err(LineageIdentityError::StaticSubjectConflictsWithDerived {
-                subject_id,
-            });
+            return Err(LineageIdentityError::StaticSubjectConflictsWithDerived { subject_id });
         }
         self.reserved_static_subjects.insert(subject_id);
         Ok(())
     }
 
     /// Resolve a BirthKey to its stable subject ID, rejecting collisions.
-    pub fn resolve(
-        &mut self,
-        birth: BirthKey,
-    ) -> Result<SubjectId, LineageIdentityError> {
+    pub fn resolve(&mut self, birth: BirthKey) -> Result<SubjectId, LineageIdentityError> {
         if let Some(existing) = self.subjects_by_birth_key.get(&birth) {
             return Ok(*existing);
         }
@@ -260,9 +253,7 @@ impl LineageIdRegistry {
         let subject_id = candidate | DYNAMIC_ID_MARKER;
 
         if self.reserved_static_subjects.contains(&subject_id) {
-            return Err(LineageIdentityError::DerivedSubjectConflictsWithStatic {
-                subject_id,
-            });
+            return Err(LineageIdentityError::DerivedSubjectConflictsWithStatic { subject_id });
         }
 
         if let Some(first_birth) = self.birth_keys_by_subject.get(&subject_id) {
@@ -279,10 +270,9 @@ impl LineageIdRegistry {
                 .expect("dynamic marker guarantees nonzero ID"));
         }
 
-        let subject = SubjectId::from_nonzero_raw(subject_id)
-            .expect("dynamic marker guarantees nonzero ID");
-        self.birth_keys_by_subject
-            .insert(subject_id, birth.clone());
+        let subject =
+            SubjectId::from_nonzero_raw(subject_id).expect("dynamic marker guarantees nonzero ID");
+        self.birth_keys_by_subject.insert(subject_id, birth.clone());
         self.subjects_by_birth_key.insert(birth, subject);
         Ok(subject)
     }
@@ -301,12 +291,7 @@ mod tests {
         SubjectId::agent(value).expect("parent ID is nonzero")
     }
 
-    fn birth(
-        namespace: u64,
-        parents: &[u32],
-        event: u128,
-        slot: u32,
-    ) -> BirthKey {
+    fn birth(namespace: u64, parents: &[u32], event: u128, slot: u32) -> BirthKey {
         BirthKey::new(
             namespace,
             parents.iter().copied().map(parent),
