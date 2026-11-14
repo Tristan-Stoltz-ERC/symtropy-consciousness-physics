@@ -236,7 +236,9 @@ fn main() {
             std::process::exit(2);
         }
     };
-    eprintln!("Seed schedule: {}", seed_schedule.describe());
+    if seed_schedule.is_overridden() {
+        eprintln!("Seed schedule: {}", seed_schedule.describe());
+    }
     eprintln!("=== Cooperation Decomposition ===");
     eprintln!("Is passive cooperation load-bearing, or epiphenomenal?");
     eprintln!("{AGENTS} agents, {TICKS} ticks, {} seeds, 6 conditions", seed_schedule.len());
