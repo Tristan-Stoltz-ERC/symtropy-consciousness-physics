@@ -132,6 +132,31 @@ jobs:
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
         run: cargo +"$RUST_TOOLCHAIN" test --locked --lib paired_inference::tests
+      - name: Execute and parse synthetic paired-ablation receipts
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup run "$RUST_TOOLCHAIN" cargo run --locked --example phi_ablation -- --receipt-smoke \
+            > "$RUNNER_TEMP/paired-ablation-smoke.log"
+          sed -n 's/^PAIRED_ANALYSIS_JSON=//p' \
+            "$RUNNER_TEMP/paired-ablation-smoke.log" > "$RUNNER_TEMP/paired-ablation-receipts.jsonl"
+          test "$(wc -l < "$RUNNER_TEMP/paired-ablation-receipts.jsonl")" -eq 9
+          jq -se '
+            length == 9 and
+            all(.[];
+              .schema == "luminous.symtropy.paired-ablation-receipt.v0.1" and
+              .n == 30 and
+              (.seed_ids | length) == 30 and
+              .bootstrap.replicates == 20000 and
+              .bootstrap.confidence_level == 0.95 and
+              .sign_flip.status == "not_evaluated" and
+              .equivalence.status == "not_evaluated" and
+              (has("p_value") | not)
+            )
+          ' "$RUNNER_TEMP/paired-ablation-receipts.jsonl"
+          sha256sum "$RUNNER_TEMP/paired-ablation-receipts.jsonl"
       - name: Test replicate-keyed scalar ablation random control and receipts
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
