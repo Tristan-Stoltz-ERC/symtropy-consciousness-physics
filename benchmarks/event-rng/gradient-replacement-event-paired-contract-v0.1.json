@@ -1,0 +1,90 @@
+{
+  "schema": "luminous.symtropy.gradient-replacement-event-rng-paired.v0.1",
+  "status": "additive_controller_event_rng_and_seed_paired_effect_receipts",
+  "historical_default": {
+    "rng_mode": "legacy_lcg",
+    "initial_state_rng": "unchanged_lcg",
+    "random_walk_rng": "unchanged_mutable_lcg",
+    "published_outputs_rewritten": false
+  },
+  "event_addressed_mode": {
+    "environment_variable": "SYMTROPY_GRADIENT_REPLACEMENT_RNG",
+    "accepted_values": ["legacy", "event"],
+    "default": "legacy",
+    "algorithm": "philox4x64-10",
+    "key": ["replicate_seed_u64", "experiment_namespace_u64"],
+    "counter": [
+      "stable_agent_subject_id_u64",
+      "simulation_tick_u64",
+      "event_kind_RANDOM_WALK",
+      "draw_purpose_RANDOM_WALK_ANGLE",
+      "occurrence_ordinal_zero",
+      "block_zero"
+    ],
+    "uniform_mapping": "strict_open_interval_uniform_open01",
+    "initialization_rng_changed": false
+  },
+  "design": {
+    "agents": 20,
+    "ticks": 8000,
+    "seed_schedule": "ExperimentSeedSchedule historical formula; default 42 + 997 * index",
+    "controllers": [
+      "FEP_GRADIENT",
+      "WELL_ONLY",
+      "PARTNER_ONLY",
+      "GREEDY_ENERGY",
+      "RANDOM_WALK",
+      "STATIONARY"
+    ],
+    "exploratory_replicates": 20,
+    "confirmatory_replicate_target_min": 30
+  },
+  "paired_analysis": {
+    "reference": "FEP_GRADIENT",
+    "estimand": "controller_minus_FEP_GRADIENT",
+    "pairing_key": "actual_seed_value",
+    "outcomes": ["alive", "energy", "clustering", "cooperation"],
+    "resampling_unit": "complete_seed_pair",
+    "bootstrap": {
+      "method": "percentile",
+      "replicates": 20000,
+      "confidence_level": 0.95,
+      "rng": "SplitMix64_non_cryptographic",
+      "seed": "unique_fixed_per_controller_and_outcome"
+    },
+    "sign_flip": {
+      "status": "not_evaluated",
+      "reason": "seed_pairing_does_not_establish_sign_exchangeability"
+    },
+    "equivalence": {
+      "status": "not_evaluated",
+      "reason": "no_preregistered_outcome_specific_margin"
+    },
+    "p_values_emitted": false,
+    "agents_and_ticks_are_independent_replicates": false
+  },
+  "smoke_test": {
+    "mode": "--receipt-smoke",
+    "synthetic_controllers": 6,
+    "seed_pairs": 20,
+    "outcomes": 4,
+    "expected_receipt_count": 20,
+    "byte_hash_receipts": true
+  },
+  "tests": [
+    "event_mode_same_address_repeatability",
+    "event_mode_seed_agent_tick_separation",
+    "event_mode_open_interval",
+    "legacy_lcg_stream_preserved",
+    "missing_mode_defaults_to_legacy",
+    "invalid_mode_rejected",
+    "paired_receipt_count_and_schema"
+  ],
+  "nonclaims": [
+    "no_TestU01_or_PractRand_pass",
+    "no_physical_or_social_causal_validity_claim",
+    "no_confirmatory_significance_claim",
+    "no_equivalence_claim",
+    "no_SOTA_performance_claim"
+  ]
+}
