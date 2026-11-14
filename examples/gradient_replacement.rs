@@ -66,14 +66,20 @@ enum RandomWalkRngMode {
 }
 
 impl RandomWalkRngMode {
-    fn from_env() -> Result<Self, String> {
-        match std::env::var("SYMTROPY_GRADIENT_REPLACEMENT_RNG") {
-            Ok(value) if value == "event" => Ok(Self::EventAddressed),
-            Ok(value) if value == "legacy" => Ok(Self::LegacyLcg),
-            Ok(value) => Err(format!(
+    fn parse(value: Option<&str>) -> Result<Self, String> {
+        match value {
+            Some("event") => Ok(Self::EventAddressed),
+            Some("legacy") | None => Ok(Self::LegacyLcg),
+            Some(value) => Err(format!(
                 "SYMTROPY_GRADIENT_REPLACEMENT_RNG must be 'legacy' or 'event', got {value:?}"
             )),
-            Err(std::env::VarError::NotPresent) => Ok(Self::LegacyLcg),
+        }
+    }
+
+    fn from_env() -> Result<Self, String> {
+        match std::env::var("SYMTROPY_GRADIENT_REPLACEMENT_RNG") {
+            Ok(value) => Self::parse(Some(&value)),
+            Err(std::env::VarError::NotPresent) => Self::parse(None),
             Err(error) => Err(format!(
                 "could not read SYMTROPY_GRADIENT_REPLACEMENT_RNG: {error}"
             )),
@@ -462,6 +468,41 @@ fn run_experiment(ctrl: Controller, seed: u64, rng_mode: RandomWalkRngMode) -> R
     }
 }
 
+fn synthetic_controller_results() -> Vec<(&'static str, Vec<ReplaceResult>)> {
+    const CONTROLLERS: [&str; 6] = [
+        "FEP_GRADIENT",
+        "WELL_ONLY",
+        "PARTNER_ONLY",
+        "GREEDY_ENERGY",
+        "RANDOM_WALK",
+        "STATIONARY",
+    ];
+
+    CONTROLLERS
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(controller_index, name)| {
+            let offset = controller_index as f64 * 0.2;
+            let results = (0..SEEDS)
+                .map(|seed_index| {
+                    let seed = 42 + seed_index as u64 * 997;
+                    let replicate = seed_index as f64;
+                    ReplaceResult {
+                        controller: name,
+                        seed,
+                        alive: 8.0 + (seed_index % 5) as f64 + offset,
+                        clustering: 2.0 + replicate * 0.05 + offset,
+                        cooperation: 100.0 + replicate * 3.0 + offset * 10.0,
+                        energy: 200.0 + replicate * 0.75 + offset * 2.0,
+                    }
+                })
+                .collect();
+            (name, results)
+        })
+        .collect()
+}
+
 fn main() {
     let rng_mode = match RandomWalkRngMode::from_env() {
         Ok(mode) => mode,
@@ -471,6 +512,12 @@ fn main() {
         }
     };
     eprintln!("random_walk_rng_mode={}", rng_mode.label());
+
+    if std::env::args().any(|argument| argument == "--receipt-smoke") {
+        let synthetic = synthetic_controller_results();
+        emit_paired_controller_receipts(&synthetic, rng_mode);
+        return;
+    }
 
     let seed_schedule = match ExperimentSeedSchedule::from_env(SEEDS) {
         Ok(schedule) => schedule,
@@ -744,14 +791,20 @@ mod event_random_walk_tests {
     }
 
     #[test]
-    fn default_rng_mode_is_legacy_when_environment_is_absent() {
-        // This checks the parser's default contract without relying on the
-        // process environment, which may be shared by parallel test threads.
-        assert_eq!(RandomWalkRngMode::LegacyLcg.label(), "legacy_lcg");
+    fn missing_rng_mode_defaults_to_legacy_and_invalid_values_fail_closed() {
         assert_eq!(
-            RandomWalkRngMode::EventAddressed.label(),
-            "event_addressed_philox4x64_10"
+            RandomWalkRngMode::parse(None).unwrap(),
+            RandomWalkRngMode::LegacyLcg
         );
+        assert_eq!(
+            RandomWalkRngMode::parse(Some("event")).unwrap(),
+            RandomWalkRngMode::EventAddressed
+        );
+        assert_eq!(
+            RandomWalkRngMode::parse(Some("legacy")).unwrap(),
+            RandomWalkRngMode::LegacyLcg
+        );
+        assert!(RandomWalkRngMode::parse(Some("anything-else")).is_err());
     }
 }
 
