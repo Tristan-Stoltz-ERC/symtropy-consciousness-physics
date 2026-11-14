@@ -136,6 +136,13 @@ impl BirthKey {
     }
 }
 
+/// One complete lineage receipt entry, suitable for deterministic evidence export.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineageAssignment {
+    pub birth_key: BirthKey,
+    pub subject_id: SubjectId,
+}
+
 /// Fail-closed registry for static and dynamically derived subject identities.
 ///
 /// Share one registry across the counterfactual alternatives being compared.
@@ -221,6 +228,22 @@ impl LineageIdRegistry {
     /// Number of distinct dynamic births registered so far.
     pub fn dynamic_entity_count(&self) -> usize {
         self.subjects_by_birth_key.len()
+    }
+
+    /// Return complete assignments in stable SubjectId order for evidence export.
+    ///
+    /// HashMap iteration order is intentionally not exposed as a receipt order.
+    pub fn assignments(&self) -> Vec<LineageAssignment> {
+        let mut assignments = self
+            .subjects_by_birth_key
+            .iter()
+            .map(|(birth_key, subject_id)| LineageAssignment {
+                birth_key: birth_key.clone(),
+                subject_id: *subject_id,
+            })
+            .collect::<Vec<_>>();
+        assignments.sort_unstable_by_key(|assignment| assignment.subject_id.raw());
+        assignments
     }
 
     /// Number of static subject IDs reserved so far.
@@ -355,6 +378,31 @@ mod tests {
             assert_ne!(registry.resolve(other).unwrap(), base_id);
         }
         assert_eq!(registry.dynamic_entity_count(), 5);
+    }
+
+    #[test]
+    fn assignment_receipts_are_complete_and_sorted_independent_of_insertion_order() {
+        let first = birth(7, &[11, 3], 0xabc, 2);
+        let second = birth(7, &[99], 0xdef, 5);
+
+        let mut left = LineageIdRegistry::default();
+        left.resolve(first.clone()).unwrap();
+        left.resolve(second.clone()).unwrap();
+
+        let mut right = LineageIdRegistry::default();
+        right.resolve(second).unwrap();
+        right.resolve(first).unwrap();
+
+        let left_receipts = left.assignments();
+        let right_receipts = right.assignments();
+        assert_eq!(left_receipts, right_receipts);
+        assert_eq!(left_receipts.len(), 2);
+        assert!(left_receipts
+            .windows(2)
+            .all(|pair| pair[0].subject_id.raw() < pair[1].subject_id.raw()));
+        assert!(left_receipts.iter().all(|receipt| {
+            receipt.subject_id.raw() != 0 && receipt.birth_key.world_namespace() == 7
+        }));
     }
 
     #[test]
