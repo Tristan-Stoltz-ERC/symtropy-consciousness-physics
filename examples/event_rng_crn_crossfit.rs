@@ -99,8 +99,7 @@ fn replicate_seed(index: usize) -> u64 {
 }
 
 fn event_uniform(replicate: u64, namespace: u64, subject_index: u32) -> f64 {
-    let subject = SubjectId::agent(subject_index + 1)
-        .expect("benchmark subject IDs are nonzero");
+    let subject = SubjectId::agent(subject_index + 1).expect("benchmark subject IDs are nonzero");
     let address = EventAddress::new(
         replicate,
         namespace,
@@ -152,11 +151,7 @@ fn percentile(sorted: &[f64], probability: f64) -> f64 {
     }
 }
 
-fn bootstrap_variance_ratio(
-    selected: &[f64],
-    independent: &[f64],
-    seed: u64,
-) -> Interval {
+fn bootstrap_variance_ratio(selected: &[f64], independent: &[f64], seed: u64) -> Interval {
     assert_eq!(selected.len(), independent.len());
     assert!(selected.len() >= 2);
     let mut rng = SplitMix64::new(seed);
@@ -210,8 +205,7 @@ fn estimate_holdout(beta: f64) -> Vec<HoldoutEstimate> {
 
         for subject in 0..SUBJECTS_PER_REPLICATE {
             let common_u = event_uniform(seed, COMMON_NAMESPACE, subject);
-            let independent_treatment_u =
-                event_uniform(seed, INDEPENDENT_NAMESPACE, subject);
+            let independent_treatment_u = event_uniform(seed, INDEPENDENT_NAMESPACE, subject);
 
             let control = control_outcome(common_u);
             shared_sum += treatment_outcome(common_u, beta) - control;
@@ -260,7 +254,10 @@ fn run_case(beta: f64) -> CaseResult {
     // The selector is frozen before this disjoint seed range is read.
     let holdout = estimate_holdout(beta);
     let shared: Vec<_> = holdout.iter().map(|estimate| estimate.shared).collect();
-    let independent: Vec<_> = holdout.iter().map(|estimate| estimate.independent).collect();
+    let independent: Vec<_> = holdout
+        .iter()
+        .map(|estimate| estimate.independent)
+        .collect();
     let selected: Vec<_> = match selected_policy {
         CouplingPolicy::Shared => shared.clone(),
         CouplingPolicy::Independent => independent.clone(),
@@ -272,8 +269,7 @@ fn run_case(beta: f64) -> CaseResult {
     let known_ate = TREATMENT_INTERCEPT + beta / 2.0;
 
     let bootstrap_base = 0x4352_4e5f_4356_4600_u64 ^ beta.to_bits();
-    let shared_ratio_interval =
-        bootstrap_variance_ratio(&shared, &independent, bootstrap_base);
+    let shared_ratio_interval = bootstrap_variance_ratio(&shared, &independent, bootstrap_base);
     let selected_ratio_interval = if selected_policy == CouplingPolicy::Shared {
         shared_ratio_interval
     } else {
@@ -313,11 +309,9 @@ fn case_passes(result: CaseResult) -> bool {
     let means_ok = (result.shared_mean - result.known_ate).abs() < 0.01
         && (result.independent_mean - result.known_ate).abs() < 0.01
         && (result.selected_mean - result.known_ate).abs() < 0.01;
-    let selected_not_worse_than_independent =
-        result.selected_ratio < 1.10;
+    let selected_not_worse_than_independent = result.selected_ratio < 1.10;
     let negative_control_preserved = if result.theoretical_covariance < 0.0 {
-        result.shared_ratio > 1.20
-            && (result.selected_ratio - 1.0).abs() < 1.0e-12
+        result.shared_ratio > 1.20 && (result.selected_ratio - 1.0).abs() < 1.0e-12
     } else {
         true
     };
