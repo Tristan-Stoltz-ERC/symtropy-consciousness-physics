@@ -205,6 +205,19 @@ impl EventAddress {
     pub fn uniform_open01(self, draw_index: u64) -> f64 {
         open_unit_interval_from_word(self.word(draw_index))
     }
+
+    /// Iterate strictly open-interval uniform values in (0, 1), caching
+    /// Philox blocks through the underlying sequential word iterator.
+    pub fn uniforms_open01(self) -> EventUniformIter {
+        self.uniforms_open01_from(0)
+    }
+
+    /// Iterate open-interval uniform values beginning at a scalar draw index.
+    pub fn uniforms_open01_from(self, draw_index: u64) -> EventUniformIter {
+        EventUniformIter {
+            words: self.words_from(draw_index),
+        }
+    }
 }
 
 /// Sequential scalar draws from one EventAddress with a one-block cache.
@@ -237,6 +250,26 @@ impl Iterator for EventWordIter {
 }
 
 impl std::iter::FusedIterator for EventWordIter {}
+
+
+/// Sequential open-interval f64 values from one EventAddress.
+///
+/// This wrapper reuses EventWordIter's four-word Philox block cache and applies
+/// the same top-52-bit midpoint conversion as uniform_open01(draw_index).
+#[derive(Debug, Clone)]
+pub struct EventUniformIter {
+    words: EventWordIter,
+}
+
+impl Iterator for EventUniformIter {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.words.next().map(open_unit_interval_from_word)
+    }
+}
+
+impl std::iter::FusedIterator for EventUniformIter {}
 
 /// Random123 Philox4x64 with ten rounds. Counter is four u64 words; key is two.
 pub fn philox4x64_10(mut counter: [u64; 4], mut key: [u64; 2]) -> [u64; 4] {
@@ -340,6 +373,63 @@ mod tests {
             purpose,
             occurrence,
         )
+    }
+
+    #[test]
+    fn cached_uniform_iterator_matches_random_access_across_block_boundaries() {
+        let addr = address(
+            SubjectId::agent(27).unwrap(),
+            107,
+            registry::RANDOM_WALK,
+            registry::RANDOM_WALK_ANGLE,
+            2,
+        );
+        let direct: Vec<_> = (0..13)
+            .map(|index| addr.uniform_open01(index))
+            .collect();
+        let sequential: Vec<_> = addr.uniforms_open01().take(13).collect();
+        assert_eq!(
+            sequential.iter().map(|value| value.to_bits()).collect::<Vec<_>>(),
+            direct.iter().map(|value| value.to_bits()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn cached_uniform_iterator_supports_nonzero_start_and_stays_open() {
+        let addr = address(
+            SubjectId::agent(28).unwrap(),
+            108,
+            registry::ENVIRONMENT,
+            registry::ENVIRONMENTAL_NOISE,
+            0,
+        );
+        let direct: Vec<_> = (3..20)
+            .map(|index| addr.uniform_open01(index))
+            .collect();
+        let sequential: Vec<_> = addr.uniforms_open01_from(3).take(17).collect();
+        assert_eq!(
+            sequential.iter().map(|value| value.to_bits()).collect::<Vec<_>>(),
+            direct.iter().map(|value| value.to_bits()).collect::<Vec<_>>()
+        );
+        assert!(sequential.iter().all(|value| *value > 0.0 && *value < 1.0));
+    }
+
+    #[test]
+    fn cached_uniform_iterator_emits_terminal_u64_draw_once() {
+        let addr = address(
+            SubjectId::agent(29).unwrap(),
+            109,
+            registry::ENVIRONMENT,
+            registry::ENVIRONMENTAL_NOISE,
+            0,
+        );
+        let mut final_uniform = addr.uniforms_open01_from(u64::MAX);
+        assert_eq!(
+            final_uniform.next().map(f64::to_bits),
+            Some(addr.uniform_open01(u64::MAX).to_bits())
+        );
+        assert_eq!(final_uniform.next(), None);
+        assert_eq!(final_uniform.next(), None);
     }
 
     #[test]
