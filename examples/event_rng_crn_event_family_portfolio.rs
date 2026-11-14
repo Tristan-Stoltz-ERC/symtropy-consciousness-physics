@@ -100,21 +100,15 @@ fn seed_for(index: usize) -> u64 {
     ROOT_SEED.wrapping_add((index as u64).wrapping_mul(REPLICATE_STRIDE))
 }
 
-fn draw(
-    seed: u64,
-    namespace: u64,
-    subject_index: u32,
-    family: u8,
-) -> f64 {
-    let subject = SubjectId::agent(subject_index + 1)
-        .expect("event family subject ID must be nonzero");
+fn draw(seed: u64, namespace: u64, subject_index: u32, family: u8) -> f64 {
+    let subject =
+        SubjectId::agent(subject_index + 1).expect("event family subject ID must be nonzero");
     let (kind, purpose) = if family == 0 {
         (registry::ENVIRONMENT, registry::ENVIRONMENTAL_NOISE)
     } else {
         (registry::RANDOM_WALK, registry::RANDOM_WALK_ANGLE)
     };
-    EventAddress::new(seed, namespace, subject, 1, kind, purpose, 0)
-        .uniform_open01(0)
+    EventAddress::new(seed, namespace, subject, 1, kind, purpose, 0).uniform_open01(0)
 }
 
 fn y0(u: f64, v: f64) -> f64 {
@@ -166,8 +160,7 @@ fn holdout_estimates(
             let v_independent = draw(seed, INDEPENDENT_V_NAMESPACE, subject, 1);
             let control = y0(u_common, v_common);
 
-            let independent_treatment =
-                y1(u_independent, v_independent, beta_u, beta_v);
+            let independent_treatment = y1(u_independent, v_independent, beta_u, beta_v);
             let shared_treatment = y1(u_common, v_common, beta_u, beta_v);
 
             let global_treatment = if global_share_both {
@@ -178,8 +171,7 @@ fn holdout_estimates(
 
             let portfolio_u = if share_u { u_common } else { u_independent };
             let portfolio_v = if share_v { v_common } else { v_independent };
-            let portfolio_treatment =
-                y1(portfolio_u, portfolio_v, beta_u, beta_v);
+            let portfolio_treatment = y1(portfolio_u, portfolio_v, beta_u, beta_v);
 
             sums[0] += independent_treatment - control;
             sums[1] += shared_treatment - control;
@@ -207,7 +199,10 @@ fn mean(values: &[f64]) -> f64 {
 fn variance(values: &[f64]) -> f64 {
     assert!(values.len() >= 2);
     let avg = mean(values);
-    values.iter().map(|value| (value - avg).powi(2)).sum::<f64>()
+    values
+        .iter()
+        .map(|value| (value - avg).powi(2))
+        .sum::<f64>()
         / (values.len() - 1) as f64
 }
 
@@ -223,11 +218,7 @@ fn percentile(sorted: &[f64], p: f64) -> f64 {
     }
 }
 
-fn bootstrap_ratio_interval(
-    candidate: &[f64],
-    independent: &[f64],
-    seed: u64,
-) -> Interval {
+fn bootstrap_ratio_interval(candidate: &[f64], independent: &[f64], seed: u64) -> Interval {
     assert_eq!(candidate.len(), independent.len());
     let mut rng = SplitMix64::new(seed);
     let mut ratios = Vec::with_capacity(BOOTSTRAP_DRAWS);
@@ -284,8 +275,7 @@ fn theoretical_portfolio_variance(beta_u: f64, beta_v: f64) -> f64 {
 }
 
 fn run_case(beta_u: f64, beta_v: f64) -> Case {
-    let (covariance_u_train, covariance_v_train) =
-        training_covariances(beta_u, beta_v);
+    let (covariance_u_train, covariance_v_train) = training_covariances(beta_u, beta_v);
     let covariance_total_train = covariance_u_train + covariance_v_train;
 
     // Each family is selected independently from training data only.
@@ -293,14 +283,11 @@ fn run_case(beta_u: f64, beta_v: f64) -> Case {
     let share_v = covariance_v_train > 0.0;
     let global_share_both = covariance_total_train > 0.0;
 
-    let holdout = holdout_estimates(
-        beta_u,
-        beta_v,
-        share_u,
-        share_v,
-        global_share_both,
-    );
-    let all_independent = holdout.iter().map(|x| x.all_independent).collect::<Vec<_>>();
+    let holdout = holdout_estimates(beta_u, beta_v, share_u, share_v, global_share_both);
+    let all_independent = holdout
+        .iter()
+        .map(|x| x.all_independent)
+        .collect::<Vec<_>>();
     let all_shared = holdout.iter().map(|x| x.all_shared).collect::<Vec<_>>();
     let global = holdout.iter().map(|x| x.global).collect::<Vec<_>>();
     let per_family = holdout.iter().map(|x| x.per_family).collect::<Vec<_>>();
@@ -310,9 +297,7 @@ fn run_case(beta_u: f64, beta_v: f64) -> Case {
     let v_global = variance(&global);
     let v_portfolio = variance(&per_family);
 
-    let seed = 0x4556_4641_4d49_4c59_u64
-        ^ beta_u.to_bits()
-        ^ beta_v.to_bits().rotate_left(23);
+    let seed = 0x4556_4641_4d49_4c59_u64 ^ beta_u.to_bits() ^ beta_v.to_bits().rotate_left(23);
 
     Case {
         beta_u,
@@ -353,7 +338,10 @@ fn passes(case: Case) -> bool {
     let sign_v = family_covariance(case.beta_v) > 0.0;
     let global_positive = family_covariance(case.beta_u) + family_covariance(case.beta_v) > 0.0;
     let expected_ate = case.known_ate;
-    let all_means_ok = case.means.iter().all(|value| (value - expected_ate).abs() < 0.01);
+    let all_means_ok = case
+        .means
+        .iter()
+        .all(|value| (value - expected_ate).abs() < 0.01);
     let portfolio_beats_global = case.ratios[2] < case.ratios[1] * 0.90;
     let portfolio_beats_independent = case.ratios[2] < 1.0;
     let policy_correct = case.share_u == sign_u
@@ -430,7 +418,9 @@ impl SplitMix64 {
 
 fn main() {
     println!("benchmark_schema=luminous.symtropy.crn-event-family-portfolio.v0.1");
-    println!("selection_rule=per_event_family_shared_if_training_covariance_positive_else_independent");
+    println!(
+        "selection_rule=per_event_family_shared_if_training_covariance_positive_else_independent"
+    );
     println!("training_and_holdout_seed_sets_disjoint=true");
 
     const CASES: [(f64, f64); 2] = [(0.5, -1.5), (-1.5, 0.5)];
@@ -460,14 +450,8 @@ mod tests {
 
     #[test]
     fn swapping_coefficients_swaps_the_per_family_policy() {
-        let first = (
-            family_covariance(0.5) > 0.0,
-            family_covariance(-1.5) > 0.0,
-        );
-        let second = (
-            family_covariance(-1.5) > 0.0,
-            family_covariance(0.5) > 0.0,
-        );
+        let first = (family_covariance(0.5) > 0.0, family_covariance(-1.5) > 0.0);
+        let second = (family_covariance(-1.5) > 0.0, family_covariance(0.5) > 0.0);
         assert_eq!(first, (true, false));
         assert_eq!(second, (false, true));
     }
