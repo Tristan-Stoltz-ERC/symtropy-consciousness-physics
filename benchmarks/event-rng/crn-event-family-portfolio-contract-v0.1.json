@@ -1,58 +1,97 @@
 {
-  "schema":"luminous.symtropy.crn-event-family-portfolio.v0.1",
-  "status":"cross_fitted_per_event_family_coupling_portfolio",
-  "model":{
-    "control":"Y0 = U^2 + V^2",
-    "treatment":"Y1 = U^2 + beta_u*U + V^2 + beta_v*V + 0.25",
-    "known_ate":"0.25 + (beta_u + beta_v)/2",
-    "family_covariance":"4/45 + beta/12"
+  "schema": "luminous.symtropy.crn-event-family-portfolio.v0.1",
+  "status": "cross_fitted_per_event_family_coupling_portfolio",
+  "model": {
+    "control": "Y0 = U^2 + V^2",
+    "treatment": "Y1 = U^2 + beta_u*U + V^2 + beta_v*V + 0.25",
+    "known_ate": "0.25 + (beta_u + beta_v)/2",
+    "family_covariance": "4/45 + beta/12"
   },
-  "event_families":[
-    {"name":"environment_noise","event_kind":"ENVIRONMENT","draw_purpose":"ENVIRONMENTAL_NOISE"},
-    {"name":"random_walk_angle","event_kind":"RANDOM_WALK","draw_purpose":"RANDOM_WALK_ANGLE"}
+  "event_families": [
+    {
+      "name": "environment_noise",
+      "event_kind": "ENVIRONMENT",
+      "draw_purpose": "ENVIRONMENTAL_NOISE"
+    },
+    {
+      "name": "random_walk_angle",
+      "event_kind": "RANDOM_WALK",
+      "draw_purpose": "RANDOM_WALK_ANGLE"
+    }
   ],
-  "split":{
-    "train_indices":"[0,256)",
-    "holdout_indices":"[256,512)",
-    "train_replicates":256,
-    "holdout_replicates":256,
-    "subjects_per_replicate":2048,
-    "holdout_used_for_policy_selection":false
+  "split": {
+    "train_indices": "[0,256)",
+    "holdout_indices": "[256,512)",
+    "train_replicates": 256,
+    "holdout_replicates": 256,
+    "subjects_per_replicate": 2048,
+    "holdout_used_for_policy_selection": false
   },
-  "policies":[
+  "policies": [
     "ALL_INDEPENDENT",
     "ALL_SHARED",
     "GLOBAL_TOTAL_COVARIANCE_SIGN",
     "PER_EVENT_FAMILY_COVARIANCE_SIGN"
   ],
-  "preregistered_cases":[
-    {"beta_u":0.5,"beta_v":-1.5,"covariance_u":"positive","covariance_v":"negative","total_covariance":"positive","global":"SHARED_BOTH","per_family":["SHARED","INDEPENDENT"]},
-    {"beta_u":-1.5,"beta_v":0.5,"covariance_u":"negative","covariance_v":"positive","total_covariance":"positive","global":"SHARED_BOTH","per_family":["INDEPENDENT","SHARED"]}
+  "preregistered_cases": [
+    {
+      "beta_u": 0.5,
+      "beta_v": -1.5,
+      "covariance_u": "positive",
+      "covariance_v": "negative",
+      "total_covariance": "positive",
+      "global": "SHARED_BOTH",
+      "per_family": [
+        "SHARED",
+        "INDEPENDENT"
+      ]
+    },
+    {
+      "beta_u": -1.5,
+      "beta_v": 0.5,
+      "covariance_u": "negative",
+      "covariance_v": "positive",
+      "total_covariance": "positive",
+      "global": "SHARED_BOTH",
+      "per_family": [
+        "INDEPENDENT",
+        "SHARED"
+      ]
+    }
   ],
-  "holdout":{
-    "independent_unit":"outer_seed_replicate",
-    "outcomes":["ATE_mean","estimator_variance"],
-    "variance_ratio_baseline":"ALL_INDEPENDENT",
-    "bootstrap":{
-      "method":"percentile_paired_outer_replicate",
-      "replicates":2000,
-      "confidence_level":0.95,
-      "rng":"SplitMix64_with_rejection_sampling"
+  "holdout": {
+    "independent_unit": "outer_seed_replicate",
+    "outcomes": [
+      "ATE_mean",
+      "estimator_variance"
+    ],
+    "variance_ratio_baseline": "ALL_INDEPENDENT",
+    "bootstrap": {
+      "method": "percentile_paired_outer_replicate",
+      "replicates": 2000,
+      "confidence_level": 0.95,
+      "rng": "SplitMix64_with_rejection_sampling",
+      "additional_direct_comparison": {
+        "estimand": "variance_per_family_policy_over_variance_global_policy",
+        "resampling_unit": "same_paired_outer_holdout_replicate_indices",
+        "interval": "percentile_95pct",
+        "motivation": "compare_policies_directly_not_only_via_separate_ratios_to_independent_baseline"
+      }
     }
   },
-  "gates":[
+  "gates": [
     "per_family_policy_matches_training_covariance_sign",
     "global_policy_selects_shared_both_for_positive_total_covariance",
     "all_policy_means_recover_known_ate_with_error_below_0.01",
     "per_family_variance_ratio_at_least_10_percent_below_global_shared",
     "per_family_variance_ratio_below_all_independent"
   ],
-  "theoretical_variance_ratios":{
-    "all_shared_to_all_independent_approx":0.5245,
-    "per_family_to_all_independent_approx":0.3427,
-    "per_family_reduction_vs_global_all_shared_approx":0.346
+  "theoretical_variance_ratios": {
+    "all_shared_to_all_independent_approx": 0.5245,
+    "per_family_to_all_independent_approx": 0.3427,
+    "per_family_reduction_vs_global_all_shared_approx": 0.346
   },
-  "nonclaims":[
+  "nonclaims": [
     "not_a_real_symtropy_simulation",
     "not_a_universal_coupling_policy",
     "no_production_adaptive_coupling_claim",
