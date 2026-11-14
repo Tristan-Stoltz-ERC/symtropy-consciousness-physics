@@ -1,0 +1,30 @@
+{
+  "schema": "luminous.symtropy.random123-philox-parity.v0.1",
+  "status": "pinned_cross_implementation_differential_test",
+  "reference": {
+    "repository": "https://github.com/lemire/random123",
+    "commit": "ff4443af61194bb57a042cd4945f2c73bdf1d0dd",
+    "api": "r123::Philox4x64",
+    "rounds": 10
+  },
+  "corpus": {
+    "fixed_vectors": 3,
+    "raw_counter_key_pairs_default": 4096,
+    "event_address_counter_key_pairs_default": 4096,
+    "words_compared_per_case": 4,
+    "all_counter_and_key_words": "u64"
+  },
+  "integrity": [
+    "reference_checkout_sha_is_asserted",
+    "corpus_rows_are_machine_parsed",
+    "every_output_word_is_compared",
+    "no_production_Cargo_dependency_added",
+    "corpus_sha256_is_reported"
+  ],
+  "nonclaims": [
+    "not_a_TestU01_or_PractRand_result",
+    "not_a_proof_over_all_inputs",
+    "not_a_causal_validity_result",
+    "not_a_performance_comparison"
+  ]
+}
