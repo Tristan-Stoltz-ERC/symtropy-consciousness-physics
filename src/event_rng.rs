@@ -171,9 +171,31 @@ impl EventAddress {
     }
 
     /// A deterministic u64 at a scalar draw index. No mutable stream is consumed.
+    ///
+    /// This random-access method computes the containing four-word block on
+    /// every call. Use words() for sequential draws so adjacent lanes reuse a
+    /// cached block instead of recomputing the ten-round permutation.
     pub fn word(self, draw_index: u64) -> u64 {
         let words = self.block(draw_index / 4);
         words[(draw_index % 4) as usize]
+    }
+
+    /// Iterate scalar words from this event, caching each four-word block.
+    ///
+    /// The iterator is only a consumption optimization: its values are exactly
+    /// the same as word(0), word(1), ... and are independent of other iterators.
+    pub fn words(self) -> EventWordIter {
+        self.words_from(0)
+    }
+
+    /// Iterate scalar words beginning at the specified random-access index.
+    pub fn words_from(self, draw_index: u64) -> EventWordIter {
+        EventWordIter {
+            address: self,
+            next_draw_index: Some(draw_index),
+            cached_block_index: None,
+            cached_words: [0; 4],
+        }
     }
 
     /// A deterministic, strictly open-interval uniform value in (0, 1).
@@ -184,6 +206,37 @@ impl EventAddress {
         open_unit_interval_from_word(self.word(draw_index))
     }
 }
+
+/// Sequential scalar draws from one EventAddress with a one-block cache.
+///
+/// The cache is local to this iterator. Cloning an iterator copies its current
+/// position and cached block; it does not change the event address or any
+/// random value returned by another iterator.
+#[derive(Debug, Clone)]
+pub struct EventWordIter {
+    address: EventAddress,
+    next_draw_index: Option<u64>,
+    cached_block_index: Option<u64>,
+    cached_words: [u64; 4],
+}
+
+impl Iterator for EventWordIter {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let draw_index = self.next_draw_index?;
+        let block_index = draw_index / 4;
+        if self.cached_block_index != Some(block_index) {
+            self.cached_words = self.address.block(block_index);
+            self.cached_block_index = Some(block_index);
+        }
+
+        self.next_draw_index = draw_index.checked_add(1);
+        Some(self.cached_words[(draw_index % 4) as usize])
+    }
+}
+
+impl std::iter::FusedIterator for EventWordIter {}
 
 /// Random123 Philox4x64 with ten rounds. Counter is four u64 words; key is two.
 pub fn philox4x64_10(mut counter: [u64; 4], mut key: [u64; 2]) -> [u64; 4] {
@@ -287,6 +340,67 @@ mod tests {
             purpose,
             occurrence,
         )
+    }
+
+    #[test]
+    fn cached_word_iterator_matches_random_access_across_block_boundaries() {
+        let addr = address(
+            SubjectId::agent(23).unwrap(),
+            101,
+            registry::RANDOM_WALK,
+            registry::RANDOM_WALK_ANGLE,
+            2,
+        );
+        let direct: Vec<_> = (0..13).map(|index| addr.word(index)).collect();
+        let sequential: Vec<_> = addr.words().take(13).collect();
+        assert_eq!(sequential, direct);
+    }
+
+    #[test]
+    fn cached_word_iterator_supports_nonzero_start_indices() {
+        let addr = address(
+            SubjectId::agent(24).unwrap(),
+            102,
+            registry::RANDOM_WALK,
+            registry::RANDOM_WALK_ANGLE,
+            1,
+        );
+        let direct: Vec<_> = (3..11).map(|index| addr.word(index)).collect();
+        let sequential: Vec<_> = addr.words_from(3).take(8).collect();
+        assert_eq!(sequential, direct);
+    }
+
+    #[test]
+    fn cloned_cached_iterators_have_independent_positions() {
+        let addr = address(
+            SubjectId::agent(25).unwrap(),
+            103,
+            registry::RANDOM_WALK,
+            registry::RANDOM_WALK_ANGLE,
+            0,
+        );
+        let mut original = addr.words();
+        assert_eq!(original.next(), Some(addr.word(0)));
+        let mut cloned = original.clone();
+        assert_eq!(original.next(), Some(addr.word(1)));
+        assert_eq!(cloned.next(), Some(addr.word(1)));
+        assert_eq!(original.next(), Some(addr.word(2)));
+        assert_eq!(cloned.next(), Some(addr.word(2)));
+    }
+
+    #[test]
+    fn cached_word_iterator_emits_terminal_u64_draw_once() {
+        let addr = address(
+            SubjectId::agent(26).unwrap(),
+            104,
+            registry::RANDOM_WALK,
+            registry::RANDOM_WALK_ANGLE,
+            0,
+        );
+        let mut final_word = addr.words_from(u64::MAX);
+        assert_eq!(final_word.next(), Some(addr.word(u64::MAX)));
+        assert_eq!(final_word.next(), None);
+        assert_eq!(final_word.next(), None);
     }
 
     #[test]
