@@ -1,0 +1,45 @@
+{
+  "schema": "luminous.symtropy.event-identity-claim-audit.v0.1",
+  "status": "model_owned_semantic_claim_auditor",
+  "claim": ["semantic_event_id_u128_nonzero", "complete_event_address", "sharing_policy"],
+  "sharing_policies": ["must_share", "conditional", "distinct"],
+  "hard_failures": [
+    "duplicate_semantic_claim_within_scenario",
+    "semantic_id_split_across_addresses_within_scenario",
+    "semantic_alias_within_scenario",
+    "semantic_alias_across_scenarios",
+    "semantic_id_split_across_scenarios",
+    "sharing_policy_drift",
+    "missing_must_share_event",
+    "distinct_event_claimed_in_both_scenarios"
+  ],
+  "reported_counts": [
+    "reference_claims",
+    "counterfactual_claims",
+    "must_share_matched",
+    "conditional_matched",
+    "conditional_reference_only",
+    "conditional_counterfactual_only",
+    "distinct_reference_only",
+    "distinct_counterfactual_only"
+  ],
+  "acceptance_targets": {
+    "semantic_aliases": 0,
+    "duplicate_claims": 0,
+    "must_share_missing": 0,
+    "policy_drift": 0,
+    "distinct_matched": 0,
+    "input_order_invariance": true
+  },
+  "not_implemented": [
+    "dynamic_genealogical_subject_id_generation",
+    "model_registry_population",
+    "existing_symtropy_call_site_instrumentation",
+    "automatic_semantic_identity_inference"
+  ],
+  "nonclaims": [
+    "audit_consistency_does_not_prove_semantic_truth",
+    "not_a_causal_identification_proof",
+    "no_historical_experiment_outputs_changed"
+  ]
+}
