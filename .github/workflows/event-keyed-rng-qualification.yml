@@ -60,6 +60,7 @@ jobs:
             benchmarks/event-rng/event-identity-claim-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.event-rng-throughput.v0.1"' \
             benchmarks/event-rng/throughput-contract-v0.1.json
+          grep -F 'event_address_cached_uniform_stream' examples/event_rng_throughput.rs
           grep -F 'benchmark_status=MEASURED_NO_WINNER_DECLARED' examples/event_rng_throughput.rs
           jq -e '.schema == "luminous.symtropy.random123-philox-parity.v0.1"' \
             benchmarks/event-rng/reference-parity-contract-v0.1.json

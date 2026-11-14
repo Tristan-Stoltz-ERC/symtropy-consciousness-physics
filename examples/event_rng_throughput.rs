@@ -28,16 +28,18 @@ enum BenchmarkKind {
     EventConstructBlock,
     EventPrebuiltWord,
     EventPrebuiltCachedStream,
+    EventPrebuiltCachedUniformStream,
 }
 
 impl BenchmarkKind {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::LegacyLcg53,
         Self::PhiloxCoreBlock,
         Self::EventConstructWord,
         Self::EventConstructBlock,
         Self::EventPrebuiltWord,
         Self::EventPrebuiltCachedStream,
+        Self::EventPrebuiltCachedUniformStream,
     ];
 
     const fn label(self) -> &'static str {
@@ -48,6 +50,7 @@ impl BenchmarkKind {
             Self::EventConstructBlock => "event_address_construct_plus_block",
             Self::EventPrebuiltWord => "event_address_prebuilt_scalar_word",
             Self::EventPrebuiltCachedStream => "event_address_cached_scalar_stream",
+            Self::EventPrebuiltCachedUniformStream => "event_address_cached_uniform_stream",
         }
     }
 
@@ -56,7 +59,8 @@ impl BenchmarkKind {
             Self::LegacyLcg53
             | Self::EventConstructWord
             | Self::EventPrebuiltWord
-            | Self::EventPrebuiltCachedStream => 1,
+            | Self::EventPrebuiltCachedStream
+            | Self::EventPrebuiltCachedUniformStream => 1,
             Self::PhiloxCoreBlock | Self::EventConstructBlock => 4,
         }
     }
@@ -171,6 +175,16 @@ fn event_prebuilt_cached_stream(iterations: usize) -> u64 {
     black_box(checksum)
 }
 
+fn event_prebuilt_cached_uniform_stream(iterations: usize) -> u64 {
+    let mut uniforms = address_for(1).uniforms_open01();
+    let mut checksum = 0_u64;
+    for _ in 0..iterations {
+        let value = uniforms.next().expect("benchmark draw count is finite");
+        checksum = checksum.wrapping_add(black_box(value.to_bits()));
+    }
+    black_box(checksum)
+}
+
 fn run(kind: BenchmarkKind, round: usize, iterations: usize) -> Sample {
     let started = Instant::now();
     let checksum = match kind {
@@ -180,6 +194,9 @@ fn run(kind: BenchmarkKind, round: usize, iterations: usize) -> Sample {
         BenchmarkKind::EventConstructBlock => event_construct_block(iterations),
         BenchmarkKind::EventPrebuiltWord => event_prebuilt_word(iterations),
         BenchmarkKind::EventPrebuiltCachedStream => event_prebuilt_cached_stream(iterations),
+        BenchmarkKind::EventPrebuiltCachedUniformStream => {
+            event_prebuilt_cached_uniform_stream(iterations)
+        }
     };
     let elapsed_ns = started.elapsed().as_nanos();
     Sample {

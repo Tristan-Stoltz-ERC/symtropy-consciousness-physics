@@ -7,7 +7,8 @@
     "event_address_construct_plus_word",
     "event_address_construct_plus_block",
     "event_address_prebuilt_scalar_word",
-    "event_address_cached_scalar_stream"
+    "event_address_cached_scalar_stream",
+    "event_address_cached_uniform_stream"
   ],
   "rounds": 5,
   "workload_order": "rotated_by_round",
@@ -21,7 +22,9 @@
   "correctness_controls": [
     "checksums_stable_across_rounds",
     "black_box_outputs",
-    "cached_stream_matches_event_address_random_access_word_tests"
+    "cached_stream_matches_event_address_random_access_word_tests",
+    "cached_uniform_stream_matches_random_access_uniform_bit_patterns",
+    "uniform_stream_values_strictly_inside_zero_and_one"
   ],
   "nonclaims": [
     "not_a_same_host_Random123_C_comparison",

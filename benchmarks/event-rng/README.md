@@ -9,7 +9,8 @@ This is an opt-in research track. It does not replace Symtropy's historical LCG 
 3. **Trace alignment:** matched, reference-only, counterfactual-only and mismatched event/draw accounting.
 4. **Semantic identity audit:** model-owned event IDs and MustShare / Conditional / Distinct policy; fail closed on alias, split identity, duplicates, policy drift and missing MustShare claims.
 5. **Causal benchmark:** analytical counterfactual model with a positive-covariance CRN case and a negative-covariance control.
-6. **Throughput benchmark:** raw Philox, address construction, prebuilt address access and historical LCG helper measured separately.
+6. **Throughput benchmark:** raw Philox, address construction, random-access scalar, cached sequential scalar, cached open-uniform and historical LCG helper measured separately.
+7. **Independent reference parity:** pinned Random123 C++ differential comparison across raw and event-address-derived counter/key pairs.
 
 ## Evidence currently available
 
@@ -40,6 +41,18 @@ Both estimators recovered the analytical ATE within the fixture tolerance. The r
 
 This is a deterministic software fixture, not a real Symtropy physical/social experiment or a causal-validity result.
 
+### Independent implementation parity
+
+The pinned Random123 differential workflow passed the exact Rust 1.99.1, 1.100.0 and 1.101.0-beta.1 lanes on the parity PR head. It compared **4,099 cases / 16,396 output words** with zero mismatches against Random123 commit `ff4443af61194bb57a042cd4945f2c73bdf1d0dd`.
+
+The corpus comprised three fixed vectors, 2,048 raw counter/key pairs and 2,048 event-address-derived pairs. This is finite differential parity, not TestU01/PractRand qualification or a proof over the entire input space.
+
+### Cached sequential-word throughput
+
+A five-round Rust 1.100 hosted-runner smoke measured the cached u64 iterator at **5.284 ns/word**, versus **11.061 ns/word** for repeated random-access scalar calls on a prebuilt address, with stable checksums. The block API measured **3.023 ns/word** in the same run. This indicates that the iterator removes repeated Philox block calculations but block consumption remains the lowest-cost supported path in that sample.
+
+These are shared-runner microbenchmarks, not same-host Random123 performance comparisons or SOTA claims.
+
 ## Contracts and specifications
 
 - [Philox implementation contract](implementation-contract-v0.1.json)
@@ -49,6 +62,7 @@ This is a deterministic software fixture, not a real Symtropy physical/social ex
 - [Semantic identity claim-audit contract](event-identity-claim-contract-v0.1.json)
 - [SOTA qualification contract](sota-qualification-contract-v0.1.json)
 - [Throughput benchmark contract](throughput-contract-v0.1.json)
+- [Random123 reference parity contract](reference-parity-contract-v0.1.json)
 
 Research documents are in docs/research:
 - EVENT_KEYED_RNG_IMPLEMENTATION_V0_1.md
@@ -58,18 +72,20 @@ Research documents are in docs/research:
 - EVENT_IDENTITY_CLAIM_AUDIT_V0_1.md
 - EVENT_KEYED_RNG_SOTA_QUALIFICATION_V0_1.md
 - EVENT_RNG_THROUGHPUT_BENCHMARK_V0_1.md
+- EVENT_RNG_RANDOM123_REFERENCE_PARITY_V0_1.md
 
 ## Not yet qualified
 
 - TestU01 SmallCrush, Crush and BigCrush.
 - PractRand staged stream tests.
-- Rust-versus-Random123 C reference throughput and parity.
+- Rust-versus-Random123 C reference throughput (parity is now qualified on the finite corpus; throughput comparison remains unrun).
 - Aarch64 and cross-language parity.
 - GPU implementation or qualification.
 - Dynamic-entity genealogical ID allocation.
 - Population of a model-owned event registry.
 - Integration into actual Symtropy simulation call sites.
 - Same-host application performance or end-to-end estimator improvement in a real model.
+- TestU01/PractRand statistical batteries for this Rust port.
 
 Do not treat the fact that Random123's published implementation passed statistical batteries as inherited qualification of this Rust port. Do not claim a new RNG statistical-quality or throughput SOTA from the current evidence.
 
