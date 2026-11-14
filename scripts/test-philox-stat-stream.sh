@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-TOOLCHAIN="\${1:-1.100.0}"
-BLOCKS="\${2:-4096}"
+TOOLCHAIN="${1:-1.100.0}"
+BLOCKS="${2:-4096}"
 ROOT="$(git rev-parse --show-toplevel)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
