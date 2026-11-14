@@ -33,14 +33,33 @@ actual_records="$(jq 'length' "$OUTPUT/compiler-artifacts.json")"
   echo "artifact record count mismatch or empty artifact manifest" >&2; exit 1;
 }
 
-while IFS=$'\t' read -r relative expected_sha expected_size; do
+while IFS=
+if [[ -n "$ROOT" ]]; then
+  ROOT="$(realpath -e "$ROOT")"
+  [[ "$(git -C "$ROOT" rev-parse HEAD)" == "$(jq -r '.source.git_commit' "$PASSPORT")" ]] || { echo "source commit mismatch" >&2; exit 1; }
+  [[ "$(git -C "$ROOT" rev-parse 'HEAD^{tree}')" == "$(jq -r '.source.git_tree' "$PASSPORT")" ]] || { echo "source tree mismatch" >&2; exit 1; }
+  lock_path="$(jq -r '.source.lockfile_path' "$PASSPORT")"
+  manifest_path="$(jq -r '.source.manifest_path' "$PASSPORT")"
+  [[ "$(sha256_file "$ROOT/$lock_path")" == "$(jq -r '.source.cargo_lock_sha256' "$PASSPORT")" ]] || { echo "Cargo.lock mismatch" >&2; exit 1; }
+  [[ "$(sha256_file "$ROOT/$manifest_path")" == "$(jq -r '.source.manifest_sha256' "$PASSPORT")" ]] || { echo "manifest mismatch" >&2; exit 1; }
+fi
+
+printf 'PASS_ARTIFACT_PASSPORT_INTEGRITY_ONLY\n'
+printf 'compiler_artifact_records=%s\n' "$actual_records"
+printf 'artifact_files=%s\n' "$(jq -r '.artifacts.file_count' "$PASSPORT")"
+\t' read -r artifact_root relative expected_sha expected_size; do
   [[ -n "$relative" ]] || continue
   case "$relative" in /*|../*|*/../*|*/..) echo "unsafe artifact path: $relative" >&2; exit 1 ;; esac
-  resolved="$(realpath -e "$TARGET_DIR/$relative")"
-  case "$resolved" in "$TARGET_DIR"/*) ;; *) echo "artifact escapes target dir" >&2; exit 1 ;; esac
+  case "$artifact_root" in
+    target) artifact_base="$TARGET_DIR" ;;
+    build) artifact_base="$OUTPUT/build" ;;
+    *) echo "unknown Cargo artifact root: $artifact_root" >&2; exit 1 ;;
+  esac
+  resolved="$(realpath -e "$artifact_base/$relative")"
+  case "$resolved" in "$artifact_base"/*) ;; *) echo "artifact escapes recorded Cargo root: $relative" >&2; exit 1 ;; esac
   [[ "$(sha256_file "$resolved")" == "$expected_sha" ]] || { echo "artifact hash mismatch: $relative" >&2; exit 1; }
   [[ "$(stat -c '%s' -- "$resolved")" == "$expected_size" ]] || { echo "artifact size mismatch: $relative" >&2; exit 1; }
-done < <(jq -r '.artifacts.compiler_artifacts[] | .files[] | [.path,.sha256,(.size_bytes|tostring)] | @tsv' "$PASSPORT")
+done < <(jq -r '.artifacts.compiler_artifacts[] | .files[] | [.root,.path,.sha256,(.size_bytes|tostring)] | @tsv' "$PASSPORT")
 
 if [[ -n "$ROOT" ]]; then
   ROOT="$(realpath -e "$ROOT")"
