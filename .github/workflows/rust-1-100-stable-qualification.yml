@@ -9,6 +9,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  cargo-artifact-passport-self-test:
+    name: Cargo artifact passport integrity and tamper controls
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Parse contract and check shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.schema == "luminous.cargo-artifact-passport.v0.1"' benchmarks/rust-toolchain/cargo-artifact-passport-v0.1.json
+          bash -n scripts/capture-cargo-artifacts.sh
+          bash -n scripts/verify-cargo-artifact-passport.sh
+          bash -n scripts/test-cargo-artifact-passport.sh
+      - name: Run artifact mutation and provenance negative controls
+        run: bash scripts/test-cargo-artifact-passport.sh
+
   rust-1-100-stable:
     name: Rust 1.100.0 stable library qualification
     runs-on: ubuntu-24.04
@@ -145,6 +164,8 @@ jobs:
         run: bash scripts/test-cargo-1.100-lints.sh 1.101.0-beta.1 1.101.0-beta.1
       - name: Capture compiler artifacts through Cargo JSON messages
         run: bash scripts/capture-cargo-artifacts.sh 1.101.0-beta.1 "$RUNNER_TEMP/cargo-artifact-manifest"
+      - name: Independently verify Cargo artifact passport
+        run: bash scripts/verify-cargo-artifact-passport.sh "$RUNNER_TEMP/cargo-artifact-manifest" "$GITHUB_WORKSPACE"
       - name: Enforce Cargo.lock immutability
         shell: bash
         run: |
@@ -179,6 +200,8 @@ jobs:
         run: bash scripts/test-cargo-1.100-lints.sh 1.101.0-beta.1 1.101.0-beta.1
       - name: Capture Cargo artifact manifest from isolated fixture
         run: bash scripts/capture-cargo-artifacts.sh 1.101.0-beta.1 "$RUNNER_TEMP/cargo-artifact-smokes" tests/toolchain/cargo-lints/Cargo.toml
+      - name: Verify isolated fixture artifact passport
+        run: bash scripts/verify-cargo-artifact-passport.sh "$RUNNER_TEMP/cargo-artifact-smokes" "$GITHUB_WORKSPACE"
       - name: Compile and self-test dependency-free paired benchmark analyzer
         env:
           RUSTC_TOOLCHAIN: 1.101.0-beta.1
@@ -231,6 +254,8 @@ jobs:
         run: bash scripts/test-cargo-1.100-lints.sh 1.100.0 1.100.0
       - name: Capture Cargo artifact manifest from isolated fixture
         run: bash scripts/capture-cargo-artifacts.sh 1.100.0 "$RUNNER_TEMP/cargo-artifact-smokes" tests/toolchain/cargo-lints/Cargo.toml
+      - name: Verify isolated fixture artifact passport
+        run: bash scripts/verify-cargo-artifact-passport.sh "$RUNNER_TEMP/cargo-artifact-smokes" "$GITHUB_WORKSPACE"
       - name: Compile and self-test dependency-free paired benchmark analyzer
         env:
           RUSTC_TOOLCHAIN: 1.100.0
