@@ -121,7 +121,14 @@ while IFS= read -r artifact; do
         exit 1
         ;;
     esac
-    [[ "$relative" != *    files_json="$(jq -cn --argjson current "$files_json" --argjson next "$file_record" '$current + [$next]')"
+    [[ "$relative" != *$'\n'* && "$relative" != *$'\t'* ]] || { echo "unsupported artifact path control character" >&2; exit 1; }
+    file_record="$(jq -cn \
+      --arg root "$artifact_root" \
+      --arg path "$relative" \
+      --arg sha256 "$(sha256_file "$resolved")" \
+      --argjson size "$(stat -c '%s' -- "$resolved")" \
+      '{root:$root,path:$path,sha256:$sha256,size_bytes:$size}')"
+    files_json="$(jq -cn --argjson current "$files_json" --argjson next "$file_record" '$current + [$next]')"
   done
 
   jq -cn \
