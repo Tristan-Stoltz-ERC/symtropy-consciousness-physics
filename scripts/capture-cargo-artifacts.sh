@@ -1,147 +1,131 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-die() { echo "ERROR: $*" >&2; exit 2; }
-toolchain="1.100.0"
-[[ $# -ge 1 && -n "$1" ]] && toolchain="$1"
-[[ $# -ge 2 && -n "$2" ]] || die "usage: $0 TOOLCHAIN OUTPUT [MANIFEST]"
-output="$2"
-manifest_rel="Cargo.toml"
-[[ $# -ge 3 && -n "$3" ]] && manifest_rel="$3"
-root="$(git rev-parse --show-toplevel)"
-case "$manifest_rel" in /*|../*|*/../*|*/..) die "manifest path must be relative and traversal-free" ;; esac
-manifest="$(realpath -e "$root/$manifest_rel")"
-case "$manifest" in "$root"/*) ;; *) die "manifest escapes repository" ;; esac
-command -v jq >/dev/null || die "jq required"
-sha() { sha256sum -- "$1" | awk '{print $1}'; }
+TOOLCHAIN="${1:-1.100.0}"
+OUT="${2:?usage: $0 TOOLCHAIN OUTPUT_DIR [MANIFEST]}"
+MANIFEST="${3:-Cargo.toml}"
+ROOT="$(git rev-parse --show-toplevel)"
+die(){ echo "ERROR: $*" >&2; exit 2; }
+sha(){ sha256sum -- "$1" | awk '{print $1}'; }
 
-clean_source() {
-  git -C "$root" diff --quiet && git -C "$root" diff --cached --quiet || {
-    echo "tracked source changes present" >&2; git -C "$root" status --short >&2; return 1;
-  }
-  local unexpected
-  unexpected="$(git -C "$root" status --porcelain --untracked-files=all | grep -vE '^\?\? target(/|$)' || true)"
-  [[ -z "$unexpected" ]] || { echo "$unexpected" >&2; return 1; }
-}
-clean_source
-
-lock_dir="$(dirname "$manifest")"
-lock_file=""
-while [[ "$lock_dir" == "$root" || "$lock_dir" == "$root/"* ]]; do
-  if [[ -f "$lock_dir/Cargo.lock" ]]; then lock_file="$lock_dir/Cargo.lock"; break; fi
-  [[ "$lock_dir" != "$root" ]] || break
-  lock_dir="$(dirname "$lock_dir")"
+case "$MANIFEST" in ""|/*|../*|*/../*|*/..) die "manifest must be a safe repository-relative path";; esac
+MANIFEST_ABS="$(realpath -e "$ROOT/$MANIFEST")"
+case "$MANIFEST_ABS" in "$ROOT"/*) ;; *) die "manifest escapes repository";; esac
+[[ -f "$MANIFEST_ABS" ]] || die "manifest missing"
+LOCK_DIR="$(dirname "$MANIFEST_ABS")"
+LOCK=""
+while :; do
+  if [[ -f "$LOCK_DIR/Cargo.lock" ]]; then LOCK="$LOCK_DIR/Cargo.lock"; break; fi
+  [[ "$LOCK_DIR" != "$ROOT" ]] || break
+  LOCK_DIR="$(dirname "$LOCK_DIR")"
 done
-[[ -n "$lock_file" ]] || die "no applicable Cargo.lock"
+[[ -n "$LOCK" ]] || die "applicable Cargo.lock not found"
+git -C "$ROOT" diff --quiet && git -C "$ROOT" diff --cached --quiet || die "tracked source tree is dirty"
+UNTRACKED="$(git -C "$ROOT" status --porcelain --untracked-files=all | grep -vE '^\?\? target(/|$)' || true)"
+[[ -z "$UNTRACKED" ]] || die "unexpected untracked source files: $UNTRACKED"
+command -v jq >/dev/null || die "jq required"
+[[ ! -d "$OUT" || -z "$(find "$OUT" -mindepth 1 -maxdepth 1 -print -quit)" ]] || die "output directory must be empty"
+mkdir -p "$OUT"
+OUT="$(realpath "$OUT")"
+case "$OUT/" in "$ROOT/"*) die "output must be outside source worktree";; esac
+TARGET="$OUT/target"
+BUILD="$OUT/build"
+mkdir -p "$TARGET" "$BUILD"
 
-if [[ -d "$output" ]] && [[ -n "$(find "$output" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-  die "output must be empty; stale artifact reuse is forbidden"
-fi
-mkdir -p "$output"
-output="$(realpath "$output")"
-case "$output/" in "$root/"*) die "output must be outside source worktree" ;; esac
-target_dir="$output/target"
-build_dir="$output/build"
-mkdir -p "$target_dir" "$build_dir"
+RUSTC="$OUT/rustc-version.txt"
+CARGO="$OUT/cargo-version.txt"
+META="$OUT/cargo-metadata.json"
+MSG="$OUT/cargo-messages.jsonl"
+DIAG="$OUT/diagnostics.log"
+RAW="$OUT/compiler-artifacts.raw.jsonl"
+ART="$OUT/compiler-artifacts.json"
+PASS="$OUT/passport.json"
+LOCK_BEFORE="$(sha "$LOCK")"
 
-raw="$output/cargo-messages.jsonl"
-diag="$output/diagnostics.log"
-metadata="$output/cargo-metadata.json"
-records_tmp="$output/compiler-artifacts.raw.jsonl"
-records="$output/compiler-artifacts.json"
-passport="$output/passport.json"
-lock_before="$(sha "$lock_file")"
+rustup run "$TOOLCHAIN" rustc -Vv > "$RUSTC"
+rustup run "$TOOLCHAIN" cargo -Vv > "$CARGO"
+[[ "$(head -n1 "$RUSTC")" == "rustc $TOOLCHAIN "* ]] || die "rustc version mismatch"
+[[ "$(head -n1 "$CARGO")" == "cargo $TOOLCHAIN "* ]] || die "Cargo version mismatch"
+HOST="$(awk -F': ' '$1=="host"{print $2;exit}' "$RUSTC")"
+[[ -n "$HOST" ]] || die "rustc host triple missing"
 
-rustup run "$toolchain" rustc -Vv > "$output/rustc-version.txt"
-rustup run "$toolchain" cargo -Vv > "$output/cargo-version.txt"
-[[ "$(head -n1 "$output/rustc-version.txt")" == "rustc $toolchain "* ]] || die "rustc version mismatch"
-[[ "$(head -n1 "$output/cargo-version.txt")" == "cargo $toolchain "* ]] || die "Cargo version mismatch"
-host="$(awk -F': ' '$1=="host"{print $2;exit}' "$output/rustc-version.txt")"
-[[ -n "$host" ]] || die "host triple missing"
+rustup run "$TOOLCHAIN" cargo metadata --manifest-path "$MANIFEST_ABS" --locked --format-version 1 --no-deps > "$META"
+rustup run "$TOOLCHAIN" cargo fetch --manifest-path "$MANIFEST_ABS" --locked
 
-rustup run "$toolchain" cargo metadata --manifest-path "$manifest" --locked --format-version 1 --no-deps > "$metadata"
-rustup run "$toolchain" cargo fetch --manifest-path "$manifest" --locked
-
-env -u RUSTC -u CARGO_BUILD_RUSTC -u CARGO_BUILD_RUSTC_WRAPPER -u CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER \
+env -u RUSTC -u CARGO_BUILD_RUSTC \
+  CARGO_TARGET_DIR="$TARGET" CARGO_BUILD_BUILD_DIR="$BUILD" CARGO_INCREMENTAL=0 \
   RUSTC_WRAPPER="" RUSTC_WORKSPACE_WRAPPER="" \
-  CARGO_TARGET_DIR="$target_dir" CARGO_BUILD_BUILD_DIR="$build_dir" CARGO_INCREMENTAL=0 \
-  rustup run "$toolchain" cargo build --manifest-path "$manifest" --locked --all-targets --offline --target "$host" \
-  --message-format=json-render-diagnostics > "$raw" 2> "$diag"
+  CARGO_BUILD_RUSTC_WRAPPER="" CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER="" \
+  rustup run "$TOOLCHAIN" cargo build \
+    --manifest-path "$MANIFEST_ABS" --locked --all-targets --offline --target "$HOST" \
+    --config 'build.rustc="rustc"' \
+    --config 'build.rustc-wrapper=""' \
+    --config 'build.rustc-workspace-wrapper=""' \
+    --message-format=json-render-diagnostics > "$MSG" 2> "$DIAG"
 
-[[ "$lock_before" == "$(sha "$lock_file")" ]] || die "Cargo.lock changed"
-clean_source
+[[ "$LOCK_BEFORE" == "$(sha "$LOCK")" ]] || die "Cargo.lock changed"
+git -C "$ROOT" diff --quiet && git -C "$ROOT" diff --cached --quiet || die "build modified tracked source"
 
-: > "$records_tmp"
-while IFS= read -r message; do
-  package_id="$(jq -r '.package_id' <<< "$message")"
-  target_json="$(jq -c '.target' <<< "$message")"
-  profile_json="$(jq -c '.profile // null' <<< "$message")"
-  fresh_json="$(jq -c '.fresh // null' <<< "$message")"
-  executable_json="$(jq -c '(.executable != null)' <<< "$message")"
+: > "$RAW"
+while IFS= read -r item; do
+  package="$(jq -r '.package_id' <<<"$item")"
+  target_json="$(jq -c '.target' <<<"$item")"
+  profile_json="$(jq -c '.profile // null' <<<"$item")"
+  fresh_json="$(jq -c '.fresh // null' <<<"$item")"
+  executable_json="$(jq -c '(.executable != null)' <<<"$item")"
   files='[]'
-  count=0
-  while IFS= read -r filename; do
-    [[ -n "$filename" ]] || continue
-    [[ -f "$filename" ]] || die "Cargo-reported file missing: $filename"
-    resolved="$(realpath -e "$filename")"
+  mapfile -t paths < <(jq -r '.filenames[]?, (.executable // empty)' <<<"$item" | LC_ALL=C sort -u)
+  (( ${#paths[@]} > 0 )) || die "Cargo artifact has no filenames: $package"
+  for path in "${paths[@]}"; do
+    [[ -f "$path" ]] || die "Cargo-reported artifact missing: $path"
+    resolved="$(realpath -e "$path")"
     case "$resolved" in
-      "$target_dir"/*) artifact_root="target"; base="$target_dir" ;;
-      "$build_dir"/*) artifact_root="build"; base="$build_dir" ;;
-      *) die "reported file outside isolated target/build roots: $resolved" ;;
+      "$TARGET"/*) root="target"; rel="${resolved#"$TARGET"/}";;
+      "$BUILD"/*) root="build"; rel="${resolved#"$BUILD"/}";;
+      *) die "Cargo-reported file outside isolated output roots: $resolved";;
     esac
-    relative="$(realpath --relative-to="$base" "$resolved")"
-    [[ "$relative" != *$'\n'* && "$relative" != *$'\t'* ]] || die "unsupported control character in artifact path"
-    file_json="$(jq -cn --arg root "$artifact_root" --arg path "$relative" --arg hash "$(sha "$resolved")" \
-      --argjson size "$(stat -c '%s' "$resolved")" '{root:$root,path:$path,sha256:$hash,size_bytes:$size}')"
-    files="$(jq -cn --argjson current "$files" --argjson next "$file_json" '$current+[$next]')"
-    count=$((count + 1))
-  done < <(jq -r '(.filenames[]? , .executable? // empty)' <<< "$message" | LC_ALL=C sort -u)
-  [[ "$count" -gt 0 ]] || die "compiler-artifact has no files: $package_id"
-  jq -cn --arg id "$package_id" --argjson target "$target_json" --argjson profile "$profile_json" \
-    --argjson fresh "$fresh_json" --argjson exe "$executable_json" --argjson files "$files" \
-    '{package_id:$id,target:$target,profile:$profile,fresh:$fresh,has_executable:$exe,files:$files}' >> "$records_tmp"
-done < <(jq -c 'select(.reason=="compiler-artifact")' "$raw")
-[[ -s "$records_tmp" ]] || die "Cargo emitted no compiler-artifact records"
-jq -s 'sort_by(.package_id,.target.name)' "$records_tmp" > "$records"
-rm "$records_tmp"
+    [[ "$rel" != *$'\n'* && "$rel" != *$'\t'* ]] || die "unsupported control character in path"
+    rec="$(jq -cn --arg root "$root" --arg path "$rel" --arg digest "$(sha "$resolved")" --argjson size "$(stat -c '%s' "$resolved")" '{root:$root,path:$path,sha256:$digest,size_bytes:$size}')"
+    files="$(jq -cn --argjson a "$files" --argjson b "$rec" '$a+[$b]')"
+  done
+  jq -cn --arg package "$package" --argjson target "$target_json" --argjson profile "$profile_json" --argjson fresh "$fresh_json" --argjson executable "$executable_json" --argjson files "$files" \
+    '{package_id:$package,target:$target,profile:$profile,fresh:$fresh,has_executable:$executable,files:$files}' >> "$RAW"
+done < <(jq -c 'select(.reason=="compiler-artifact")' "$MSG")
+[[ -s "$RAW" ]] || die "no Cargo compiler-artifact JSON records"
+jq -s 'sort_by(.package_id,.target.name)' "$RAW" > "$ART"
+rm "$RAW"
 
-cargo_cfg_path=""
-cargo_cfg_sha=""
-if [[ -f "$root/.cargo/config.toml" ]]; then cargo_cfg_path=".cargo/config.toml"; cargo_cfg_sha="$(sha "$root/$cargo_cfg_path")"
-elif [[ -f "$root/.cargo/config" ]]; then cargo_cfg_path=".cargo/config"; cargo_cfg_sha="$(sha "$root/$cargo_cfg_path")"; fi
-cargo_home="$(printenv CARGO_HOME || printf '%s' "$HOME/.cargo")"
-cargo_home_cfg_sha=""
-if [[ -f "$cargo_home/config.toml" ]]; then cargo_home_cfg_sha="$(sha "$cargo_home/config.toml")"
-elif [[ -f "$cargo_home/config" ]]; then cargo_home_cfg_sha="$(sha "$cargo_home/config")"; fi
-rustflags="$(printenv RUSTFLAGS || true)"
-encoded_flags="$(printenv CARGO_ENCODED_RUSTFLAGS || true)"
-build_flags="$(printenv CARGO_BUILD_RUSTFLAGS || true)"
-rustc_raw="$(cat "$output/rustc-version.txt")"
-cargo_raw="$(cat "$output/cargo-version.txt")"
+PROJECT_CONFIG=""
+[[ -f "$ROOT/.cargo/config.toml" ]] && PROJECT_CONFIG="$ROOT/.cargo/config.toml"
+[[ -z "$PROJECT_CONFIG" && -f "$ROOT/.cargo/config" ]] && PROJECT_CONFIG="$ROOT/.cargo/config"
+HOME_CARGO="${CARGO_HOME:-$HOME/.cargo}"
+HOME_CONFIG=""
+[[ -f "$HOME_CARGO/config.toml" ]] && HOME_CONFIG="$HOME_CARGO/config.toml"
+[[ -z "$HOME_CONFIG" && -f "$HOME_CARGO/config" ]] && HOME_CONFIG="$HOME_CARGO/config"
 
 jq -n -S \
   --arg schema "luminous.cargo-artifact-passport.v0.1" \
-  --arg toolchain "$toolchain" --arg rustc_release "$(head -n1 "$output/rustc-version.txt")" \
-  --arg rustc_raw "$rustc_raw" --arg rustc_commit "$(awk -F': ' '$1=="commit-hash"{print $2;exit}' "$output/rustc-version.txt")" \
-  --arg cargo_release "$(head -n1 "$output/cargo-version.txt")" --arg cargo_raw "$cargo_raw" --arg host "$host" \
-  --arg commit "$(git -C "$root" rev-parse HEAD)" --arg tree "$(git -C "$root" rev-parse 'HEAD^{tree}')" \
-  --arg manifest_path "$(realpath --relative-to="$root" "$manifest")" --arg manifest_sha "$(sha "$manifest")" \
-  --arg lock_path "$(realpath --relative-to="$root" "$lock_file")" --arg lock_sha "$(sha "$lock_file")" \
-  --arg metadata_sha "$(sha "$metadata")" --arg cargo_cfg_path "$cargo_cfg_path" --arg cargo_cfg_sha "$cargo_cfg_sha" \
-  --arg cargo_home_cfg_sha "$cargo_home_cfg_sha" --arg raw_sha "$(sha "$raw")" --arg diag_sha "$(sha "$diag")" \
-  --arg rustc_sha "$(sha "$output/rustc-version.txt")" --arg cargo_sha "$(sha "$output/cargo-version.txt")" \
-  --arg records_sha "$(sha "$records")" --arg rustflags "$rustflags" --arg encoded_flags "$encoded_flags" \
-  --arg build_flags "$build_flags" --slurpfile artifacts "$records" \
+  --arg requested "$TOOLCHAIN" --arg rustc_release "$(head -n1 "$RUSTC")" --arg rustc_verbose "$(cat "$RUSTC")" \
+  --arg rustc_commit "$(awk -F': ' '$1=="commit-hash"{print $2;exit}' "$RUSTC")" \
+  --arg cargo_release "$(head -n1 "$CARGO")" --arg cargo_verbose "$(cat "$CARGO")" --arg host "$HOST" \
+  --arg commit "$(git -C "$ROOT" rev-parse HEAD)" --arg tree "$(git -C "$ROOT" rev-parse 'HEAD^{tree}')" \
+  --arg manifest "${MANIFEST_ABS#"$ROOT"/}" --arg manifest_sha "$(sha "$MANIFEST_ABS")" \
+  --arg lockfile "${LOCK#"$ROOT"/}" --arg lock_sha "$(sha "$LOCK")" \
+  --arg meta_sha "$(sha "$META")" --arg msg_sha "$(sha "$MSG")" --arg diag_sha "$(sha "$DIAG")" \
+  --arg rustc_sha "$(sha "$RUSTC")" --arg cargo_sha "$(sha "$CARGO")" --arg art_sha "$(sha "$ART")" \
+  --arg project_config_sha "$( [[ -n "$PROJECT_CONFIG" ]] && sha "$PROJECT_CONFIG" || true )" \
+  --arg home_config_sha "$( [[ -n "$HOME_CONFIG" ]] && sha "$HOME_CONFIG" || true )" \
+  --arg rustflags "${RUSTFLAGS-}" --arg encoded_rustflags "${CARGO_ENCODED_RUSTFLAGS-}" \
+  --arg build_rustflags "${CARGO_BUILD_RUSTFLAGS-}" --arg cargo_home "$HOME_CARGO" \
+  --slurpfile records "$ART" \
   '{
     schema:$schema,
-    toolchain:{requested:$toolchain,rustc_release:$rustc_release,rustc_verbose:$rustc_raw,rustc_commit:$rustc_commit,cargo_release:$cargo_release,cargo_verbose:$cargo_raw,target_triple:$host},
-    source:{git_commit:$commit,git_tree:$tree,manifest_path:$manifest_path,manifest_sha256:$manifest_sha,lockfile_path:$lock_path,cargo_lock_sha256:$lock_sha,cargo_metadata_sha256:$metadata_sha,workspace_cargo_config_path:(if $cargo_cfg_path=="" then null else $cargo_cfg_path end),workspace_cargo_config_sha256:(if $cargo_cfg_sha=="" then null else $cargo_cfg_sha end),cargo_home_config_sha256:(if $cargo_home_cfg_sha=="" then null else $cargo_home_cfg_sha end)},
-    build:{command:["cargo","build","--locked","--all-targets","--offline","--target",$host],incremental:false,rustflags:$rustflags,cargo_encoded_rustflags:$encoded_flags,cargo_build_rustflags:$build_flags,rustc_wrapper:"disabled",rustc_workspace_wrapper:"disabled",target_directory:"target",build_directory:"build",layout_policy:"cargo_json_messages_only"},
-    inputs:{cargo_metadata_sha256:$metadata_sha,cargo_messages_sha256:$raw_sha,diagnostics_sha256:$diag_sha,rustc_version_file_sha256:$rustc_sha,cargo_version_file_sha256:$cargo_sha,compiler_artifacts_file_sha256:$records_sha},
-    artifacts:{compiler_artifact_count:($artifacts[0]|length),file_count:([$artifacts[0][]|.files[]]|length),compiler_artifacts:$artifacts[0]}
-  }' > "$passport"
-sha256sum "$passport" > "$output/passport.sha256"
-bash "$root/scripts/verify-cargo-artifact-passport.sh" "$output" "$root"
-printf 'artifact_passport=%s\n' "$passport"
-printf 'artifact_passport_sha256=%s\n' "$(sha "$passport")"
-printf 'compiler_artifact_records=%s\n' "$(jq -r '.artifacts.compiler_artifact_count' "$passport")"
-printf 'artifact_files=%s\n' "$(jq -r '.artifacts.file_count' "$passport")"
+    toolchain:{requested:$requested,rustc_release:$rustc_release,rustc_verbose:$rustc_verbose,rustc_commit:$rustc_commit,cargo_release:$cargo_release,cargo_verbose:$cargo_verbose,target_triple:$host},
+    source:{git_commit:$commit,git_tree:$tree,manifest_path:$manifest,manifest_sha256:$manifest_sha,lockfile_path:$lockfile,cargo_lock_sha256:$lock_sha,cargo_metadata_sha256:$meta_sha,project_cargo_config_sha256:(if $project_config_sha=="" then null else $project_config_sha end),cargo_home_config_sha256:(if $home_config_sha=="" then null else $home_config_sha end)},
+    build:{command:["cargo","build","--locked","--all-targets","--offline","--target",$host],profile:"dev",incremental:false,rustflags:$rustflags,cargo_encoded_rustflags:$encoded_rustflags,cargo_build_rustflags:$build_rustflags,rustc:"rustup-selected-toolchain",rustc_wrapper:"disabled",rustc_workspace_wrapper:"disabled",cargo_home:$cargo_home,target_directory:"target",build_directory:"build",artifact_discovery:"Cargo compiler-artifact JSON only"},
+    inputs:{cargo_metadata_sha256:$meta_sha,cargo_messages_sha256:$msg_sha,diagnostics_sha256:$diag_sha,rustc_version_file_sha256:$rustc_sha,cargo_version_file_sha256:$cargo_sha,compiler_artifacts_file_sha256:$art_sha},
+    artifacts:{compiler_artifact_count:($records[0]|length),file_count:([$records[0][]|.files[]]|length),compiler_artifacts:$records[0]}
+  }' > "$PASS"
+sha256sum "$PASS" > "$OUT/passport.sha256"
+bash "$ROOT/scripts/verify-cargo-artifact-passport.sh" "$OUT" "$ROOT"
+echo "PASS_ARTIFACT_PASSPORT_CAPTURE"
+echo "passport=$PASS"
