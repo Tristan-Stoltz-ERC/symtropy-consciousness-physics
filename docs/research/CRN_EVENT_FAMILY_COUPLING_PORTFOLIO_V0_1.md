@@ -60,6 +60,8 @@ The software gate requires:
 - all four policy means to recover the known ATE within 0.01;
 - the per-family policy to reduce the empirical variance ratio by at least 10% relative to global all-shared and below the all-independent baseline.
 
+The receipt now also includes a paired bootstrap interval for `Var(per-family portfolio) / Var(global policy)` by resampling the same holdout replicate indices for both policies. This interval directly describes the portfolio-versus-global comparison; separate intervals against all-independent are not a substitute for it.
+
 ## Interpretation
 
 This tests whether event-family-specific coupling can outperform one global CRN decision in a controlled structural model. It is a method demonstration, not a physical or social Symtropy experiment. A real simulator would need to define event families before inspecting holdout outcomes, retain policy receipts, estimate covariance by family on training seeds, and validate the complete policy on separate holdout seeds.
