@@ -1,21 +1,28 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! PHI ABLATION: Does the consciousness metric matter?
+//! SCALAR CONTROL ABLATION: How do alternative scalar inputs compare?
 //!
-//! Tests whether clustering depends on the SPECIFIC integration measure (Φ)
-//! or whether ANY scalar produces the same effect.
+//! Tests whether clustering depends on the supplied scalar input or whether
+//! entropy, random, constant, and zero controls produce similar outcomes.
 //!
-//! 5 metric conditions × 30 seeds × 5000 ticks = 150 runs
+//! 5 scalar controls × 30 matched seeds × 3000 ticks = 150 runs
 //!
 //! Conditions:
-//! 1. PHI:      Consciousness equation (IIT-inspired integration)
-//! 2. ENTROPY:  Shannon entropy of agent state
-//! 3. RANDOM:   Uniform random [0,1] each tick
-//! 4. CONSTANT: Fixed value 0.5
-//! 5. ZERO:     No modulation (Φ = 0 always)
+//! 1. ENTROPY:       Shannon entropy proxy of agent energy fraction
+//! 2. RANDOM_LEGACY: Historical deterministic control, seed-independent by design
+//! 3. RANDOM_EVENT:  Philox event-addressed control keyed by replicate/agent/tick
+//! 4. CONSTANT:     Fixed value 0.5
+//! 5. ZERO:          No modulation
+//!
+//! This is not a test of the actual IIT-inspired Φ equation. The former PHI
+//! branch returned the constant 0.5 and duplicated CONSTANT exactly; it has
+//! been removed rather than reported as an independent scientific condition.
 
 use nalgebra::SVector;
 use symtropy_consciousness_physics::fep_gradient;
+use symtropy_consciousness_physics::event_rng::{
+    registry, EventAddress, SubjectId,
+};
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
@@ -27,26 +34,34 @@ const TICKS: usize = 3000;
 const SEEDS: usize = 30;
 
 #[derive(Clone, Copy)]
-enum PhiMetric { Phi, Entropy, Random, Constant, Zero }
+enum ScalarControl {
+    Entropy,
+    RandomLegacy,
+    RandomEvent,
+    Constant,
+    Zero,
+}
 
-impl PhiMetric {
+impl ScalarControl {
     fn name(&self) -> &'static str {
-        match self { Self::Phi => "PHI", Self::Entropy => "ENTROPY", Self::Random => "RANDOM",
-                     Self::Constant => "CONST_0.5", Self::Zero => "ZERO" }
-    }
-    fn compute(&self, energy_frac: f64, tick: u64, agent_idx: usize) -> f64 {
         match self {
-            Self::Phi => 0.5, // Will be overridden by actual equation
+            Self::Entropy => "ENTROPY_PROXY",
+            Self::RandomLegacy => "RANDOM_LEGACY",
+            Self::RandomEvent => "RANDOM_EVENT",
+            Self::Constant => "CONST_0.5",
+            Self::Zero => "ZERO",
+        }
+    }
+
+    fn compute(&self, energy_frac: f64, tick: u64, agent_idx: usize, seed: u64) -> f64 {
+        match self {
             Self::Entropy => {
                 // Shannon entropy proxy: H = -p*ln(p) where p = energy_fraction
                 let p = energy_frac.clamp(0.01, 0.99);
                 -(p * p.ln() + (1.0 - p) * (1.0 - p).ln()) / (2.0f64).ln()
             }
-            Self::Random => {
-                let mut s = tick.wrapping_mul(6364136223846793005).wrapping_add(agent_idx as u64 * 1442695040888963407);
-                s = s.wrapping_mul(6364136223846793005).wrapping_add(1);
-                (s >> 11) as f64 / (1u64 << 53) as f64
-            }
+            Self::RandomLegacy => legacy_random_control(tick, agent_idx),
+            Self::RandomEvent => event_random_control(seed, tick, agent_idx),
             Self::Constant => 0.5,
             Self::Zero => 0.0,
         }
@@ -55,7 +70,36 @@ impl PhiMetric {
 
 struct RunResult { clustering: f64, alive: usize, avg_energy: f64 }
 
-fn run(metric: PhiMetric, seed: u64) -> RunResult {
+const PHI_ABLATION_NAMESPACE: u64 = 0x5048_495f_4142_4c31;
+
+fn legacy_random_control(tick: u64, agent_idx: usize) -> f64 {
+    let mut state = tick
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(agent_idx as u64 * 1442695040888963407);
+    state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1);
+    (state >> 11) as f64 / (1_u64 << 53) as f64
+}
+
+fn event_random_control(replicate_seed: u64, tick: u64, agent_idx: usize) -> f64 {
+    let stable_agent_id = u32::try_from(agent_idx + 1)
+        .expect("agent index must fit the stable nonzero u32 subject ID");
+    let subject = SubjectId::agent(stable_agent_id)
+        .expect("stable agent ID is nonzero");
+    EventAddress::new(
+        replicate_seed,
+        PHI_ABLATION_NAMESPACE,
+        subject,
+        tick,
+        registry::PHI_ABLATION_CONTROL,
+        registry::RANDOM_METRIC_SAMPLE,
+        0,
+    )
+    .uniform_open01(0)
+}
+
+fn run(metric: ScalarControl, seed: u64) -> RunResult {
     let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, 0.0]));
     let mut consciousness = ConsciousnessField::<2>::new();
     consciousness.constants = ThermodynamicConstants {
@@ -89,10 +133,10 @@ fn run(metric: PhiMetric, seed: u64) -> RunResult {
     }
 
     for tick in 0..TICKS {
-        // Consciousness with METRIC-SPECIFIC Phi
+        // Apply the selected scalar control as ConsciousnessInputs.phi
         for (idx, &h) in handles.iter().enumerate() {
             let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
-            let phi_value = metric.compute(ef, tick as u64, idx);
+            let phi_value = metric.compute(ef, tick as u64, idx, seed);
             let inputs = ConsciousnessInputs {
                 phi: phi_value, broadcast: 0.6, working_memory: 0.5, attention: 0.5,
                 recurrence: 0.4, embodiment: 0.6, knowledge: 0.4, synchrony: 0.5,
@@ -163,11 +207,25 @@ fn run(metric: PhiMetric, seed: u64) -> RunResult {
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════╗");
-    println!("║  PHI ABLATION: Does the consciousness metric matter? ║");
+    println!("║  SCALAR CONTROL ABLATION: Event-addressed randomness ║");
     println!("╚══════════════════════════════════════════════════════╝\n");
-    println!("{} agents, {} ticks, {} seeds per condition\n", AGENTS, TICKS, SEEDS);
+    println!("{} agents, {} ticks, {} seeds per condition", AGENTS, TICKS, SEEDS);
+    println!("initial_state_rng=historical_lcg_seeded_per_replicate");
+    println!("random_event_rng=Philox4x64-10");
+    println!("random_event_key=(replicate_seed, namespace)");
+    println!("random_event_counter=(stable_agent_id, tick, event_kind, purpose, occurrence)");
+    println!("actual_phi_equation=NOT_MEASURED");
+    println!("phi_input_semantics=supplied_scalar_not_equation_output");
+    println!("legacy_random_control=does_not_include_replicate_seed");
+    println!();
 
-    let metrics = [PhiMetric::Phi, PhiMetric::Entropy, PhiMetric::Random, PhiMetric::Constant, PhiMetric::Zero];
+    let metrics = [
+        ScalarControl::Entropy,
+        ScalarControl::RandomLegacy,
+        ScalarControl::RandomEvent,
+        ScalarControl::Constant,
+        ScalarControl::Zero,
+    ];
 
     println!("{:<12} {:<12} {:<12} {:<12} {:<12}", "Metric", "Clustering", "95% CI", "Alive", "Energy");
     println!("{}", "─".repeat(60));
@@ -195,10 +253,56 @@ fn main() {
     }
 
     println!("\n═══════════════════════════════════════════════════════");
-    println!("If PHI produces significantly different clustering than");
-    println!("RANDOM/CONSTANT/ZERO, then the integration metric matters.");
-    println!("If all metrics produce similar clustering, any scalar works.");
+    println!("No equation-level Phi measurement is included in this harness.");
+    println!("Compare RANDOM_LEGACY with RANDOM_EVENT to audit seed-keyed noise.");
+    println!("All conditions share the same seed-indexed initial-state schedule.");
     println!("═══════════════════════════════════════════════════════");
 }
 
 fn nrng(s: &mut u64) -> f64 { *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (*s >> 11) as f64 / (1u64 << 53) as f64 }
+
+#[cfg(test)]
+mod event_random_control_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_control_depends_only_on_tick_and_agent_identity() {
+        assert_eq!(legacy_random_control(17, 3), legacy_random_control(17, 3));
+    }
+
+    #[test]
+    fn event_random_control_is_repeatable_for_one_replicate_agent_and_tick() {
+        let first = event_random_control(42, 17, 3);
+        let second = event_random_control(42, 17, 3);
+        assert_eq!(first.to_bits(), second.to_bits());
+    }
+
+    #[test]
+    fn event_random_control_separates_replicates_agents_and_ticks() {
+        let baseline = event_random_control(42, 17, 3);
+        assert_ne!(baseline.to_bits(), event_random_control(1_039, 17, 3).to_bits());
+        assert_ne!(baseline.to_bits(), event_random_control(42, 17, 4).to_bits());
+        assert_ne!(baseline.to_bits(), event_random_control(42, 18, 3).to_bits());
+    }
+
+    #[test]
+    fn event_random_control_is_strictly_inside_zero_and_one() {
+        for seed in [42, 1_039, 2_036, u64::MAX] {
+            for agent in 0..AGENTS {
+                for tick in [0, 1, 17, TICKS as u64 - 1] {
+                    let value = event_random_control(seed, tick, agent);
+                    assert!(value > 0.0 && value < 1.0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_and_event_addressed_controls_are_not_accidentally_identical() {
+        assert_ne!(
+            legacy_random_control(17, 3).to_bits(),
+            event_random_control(42, 17, 3).to_bits()
+        );
+    }
+}
+
