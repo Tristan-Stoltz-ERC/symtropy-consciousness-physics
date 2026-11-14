@@ -1,0 +1,71 @@
+{
+  "schema": "luminous.symtropy.event-keyed-rng-implementation.v0.1",
+  "status": "pure_mapping_prototype_not_integrated",
+  "algorithm": {
+    "name": "philox4x64-10",
+    "rounds": 10,
+    "cryptographic_security": false,
+    "reference_known_answer_tests": [
+      "Random123_examples/kat_vectors_zero",
+      "Random123_examples/kat_vectors_ones",
+      "Random123_examples/kat_vectors_mixed"
+    ]
+  },
+  "key": ["replicate_seed_u64", "experiment_namespace_u64"],
+  "counter": ["subject_id_u64", "simulation_tick_u64", "packed_event_code_u64", "block_index_u64"],
+  "packed_event_code": {
+    "event_kind_u16": "bits_63_to_48",
+    "purpose_u16": "bits_47_to_32",
+    "occurrence_ordinal_u32": "bits_31_to_0",
+    "zero_tags": "reserved_and_rejected"
+  },
+  "output": {
+    "words_per_block": 4,
+    "word_type": "u64",
+    "draw_block": "draw_index / 4",
+    "draw_lane": "draw_index % 4"
+  },
+  "uniform_open_interval": {
+    "method": "(top52 + 0.5) * 2^-52",
+    "interval": "(0, 1)",
+    "reason": "binary64_exact_midpoint; avoids top53-plus-half rounding to 1.0"
+  },
+  "identity": {
+    "environment_subject": 0,
+    "agent_id": "nonzero_u32",
+    "pair_id": "(min_agent_id << 32) | max_agent_id",
+    "pair_order": "canonical",
+    "dynamic_entity_ids": "not_implemented_model_review_required"
+  },
+  "invariance": {
+    "same_address_same_draw": true,
+    "execution_order_independent": true,
+    "scenario_and_controller_excluded": true,
+    "thread_id_excluded": true,
+    "mutable_stream_state": false
+  },
+  "test_scope": [
+    "Random123_known_answer_vectors",
+    "event_counter_mapping",
+    "lane_and_block_mapping",
+    "order_invariance",
+    "subject_pair_canonicalization",
+    "open_uniform_bounds",
+    "serial_parallel_bit_identity"
+  ],
+  "not_yet_qualified": [
+    "TestU01",
+    "BigCrush",
+    "PractRand",
+    "GPU_identity",
+    "cross_language_identity",
+    "event_semantics_review",
+    "Symtropy_call_site_integration",
+    "end_to_end_performance"
+  ],
+  "historical_outputs": {
+    "legacy_lcg_unchanged": true,
+    "existing_seed_schedule_unchanged": true,
+    "published_experiment_verdicts_unchanged": true
+  }
+}
