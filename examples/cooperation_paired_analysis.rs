@@ -43,6 +43,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         .map(|value| parse_finite(value, "--equivalence-margin"))
         .transpose()?;
     let rationale = args.get("--margin-rationale");
+    let input_sha256 = args
+        .get("--input-sha256")
+        .map(|value| validate_sha256(value))
+        .transpose()?;
     match (margin, rationale) {
         (Some(_), None) => return Err(
             "--margin-rationale is required with --equivalence-margin; document the preregistered scientific basis".into()
@@ -143,12 +147,14 @@ fn run() -> Result<(), Box<dyn Error>> {
         .collect::<Vec<_>>()
         .join(",");
     let path_json = json_string(&input_path.to_string_lossy());
+    let input_sha256_json = input_sha256.as_deref().map(json_string).unwrap_or_else(|| "null".to_string());
     println!(
         concat!(
             "{{\n",
             "  \"schema\": \"luminous.symtropy.paired-analysis-receipt.v0.1\",\n",
             "  \"status\": \"analysis_only_not_historical_verdict\",\n",
             "  \"input_path\": {},\n",
+            "  \"input_sha256\": {},\n",
             "  \"input_data_rows\": {},\n",
             "  \"control\": {},\n",
             "  \"treatment\": {},\n",
@@ -183,6 +189,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             "}}"
         ),
         path_json,
+        input_sha256_json,
         data_rows,
         json_string(control_name),
         json_string(treatment_name),
@@ -246,6 +253,7 @@ fn parse_args() -> Result<BTreeMap<String, String>, Box<dyn Error>> {
                 | "--sign-flip-seed"
                 | "--equivalence-margin"
                 | "--margin-rationale"
+                | "--input-sha256"
         ) {
             return Err(format!("unknown argument {key}").into());
         }
@@ -295,6 +303,13 @@ fn parse_u64(value: &str, name: &str) -> Result<u64, String> {
             .parse::<u64>()
             .map_err(|_| format!("invalid {name}: {value}"))
     }
+}
+
+fn validate_sha256(value: &str) -> Result<String, String> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("--input-sha256 must be exactly 64 hexadecimal characters".into());
+    }
+    Ok(value.to_ascii_lowercase())
 }
 
 fn parse_finite(value: &str, name: &str) -> Result<f64, String> {
