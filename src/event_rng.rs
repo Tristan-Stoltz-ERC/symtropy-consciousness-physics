@@ -251,7 +251,6 @@ impl Iterator for EventWordIter {
 
 impl std::iter::FusedIterator for EventWordIter {}
 
-
 /// Sequential open-interval f64 values from one EventAddress.
 ///
 /// This wrapper reuses EventWordIter's four-word Philox block cache and applies
@@ -384,13 +383,17 @@ mod tests {
             registry::RANDOM_WALK_ANGLE,
             2,
         );
-        let direct: Vec<_> = (0..13)
-            .map(|index| addr.uniform_open01(index))
-            .collect();
+        let direct: Vec<_> = (0..13).map(|index| addr.uniform_open01(index)).collect();
         let sequential: Vec<_> = addr.uniforms_open01().take(13).collect();
         assert_eq!(
-            sequential.iter().map(|value| value.to_bits()).collect::<Vec<_>>(),
-            direct.iter().map(|value| value.to_bits()).collect::<Vec<_>>()
+            sequential
+                .iter()
+                .map(|value| value.to_bits())
+                .collect::<Vec<_>>(),
+            direct
+                .iter()
+                .map(|value| value.to_bits())
+                .collect::<Vec<_>>()
         );
     }
 
@@ -403,13 +406,17 @@ mod tests {
             registry::ENVIRONMENTAL_NOISE,
             0,
         );
-        let direct: Vec<_> = (3..20)
-            .map(|index| addr.uniform_open01(index))
-            .collect();
+        let direct: Vec<_> = (3..20).map(|index| addr.uniform_open01(index)).collect();
         let sequential: Vec<_> = addr.uniforms_open01_from(3).take(17).collect();
         assert_eq!(
-            sequential.iter().map(|value| value.to_bits()).collect::<Vec<_>>(),
-            direct.iter().map(|value| value.to_bits()).collect::<Vec<_>>()
+            sequential
+                .iter()
+                .map(|value| value.to_bits())
+                .collect::<Vec<_>>(),
+            direct
+                .iter()
+                .map(|value| value.to_bits())
+                .collect::<Vec<_>>()
         );
         assert!(sequential.iter().all(|value| *value > 0.0 && *value < 1.0));
     }
