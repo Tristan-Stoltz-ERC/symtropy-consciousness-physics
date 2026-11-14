@@ -23,6 +23,7 @@ pub mod curvature;
 pub mod dimensional_leakage;
 pub mod energy;
 pub mod experiment_seed;
+/// Seed-keyed statistical primitives for paired counterfactual analysis.
 pub mod paired_inference;
 pub mod fep_gradient;
 pub mod harmony_field;
