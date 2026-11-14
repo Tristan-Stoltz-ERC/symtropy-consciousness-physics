@@ -328,7 +328,7 @@ fn main() {
         let jphi_std = std_dev(&jphi_vals);
         let jphi_ci = 1.96 * jphi_std / n.sqrt();
 
-        eprintln!("\n── {} ({}/{} converged) ──", condition.name(), converged_count, NUM_SEEDS);
+        eprintln!("\n── {} ({}/{} converged) ──", condition.name(), converged_count, seed_schedule.len());
         eprintln!("  Convergence tick:  {:.0} (mean of converged)", mean_tick);
         eprintln!("  J/Φ:              {:.6} ± {:.6} (95% CI)", mean_jphi, jphi_ci);
         eprintln!("  Final Φ:          {:.4}", mean_phi);
