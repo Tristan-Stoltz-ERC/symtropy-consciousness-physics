@@ -1,0 +1,57 @@
+{
+  "schema": "luminous.symtropy.paired-inference.v0.1",
+  "status": "additive_qualification_candidate",
+  "historical_outputs": "immutable",
+  "pairing": {
+    "key": "actual_simulation_seed_value",
+    "order": "ascending_seed_key",
+    "estimand": "treatment_minus_control",
+    "reject": ["empty_condition", "duplicate_seed", "missing_seed", "unexpected_seed", "non_finite_observation"],
+    "independent_unit": "complete_simulation_seed_replicate"
+  },
+  "summary": {
+    "mean": "arithmetic_mean_of_paired_differences",
+    "median": "median_of_paired_differences",
+    "standard_deviation": "sample_sd_n_minus_1",
+    "standardized_effect": "cohens_dz"
+  },
+  "sign_flip": {
+    "alternative": "two_sided",
+    "exact_max_pairs": 20,
+    "monte_carlo_draws_default": 99999,
+    "monte_carlo_p_value": "(extreme_draws + 1) / (draws + 1)",
+    "rng": "SplitMix64_non_cryptographic",
+    "record_rng_seed": true,
+    "assumption": "within_pair_randomization_or_justified_sign_exchangeability_or_symmetry",
+    "seed_reuse_alone_is_not_sufficient": true
+  },
+  "bootstrap": {
+    "estimand": "mean_paired_difference",
+    "method": "percentile",
+    "resampling_unit": "whole_seed_pair",
+    "replicates_default": 20000,
+    "confidence_level_default": 0.95,
+    "rng": "SplitMix64_non_cryptographic",
+    "record_rng_seed": true
+  },
+  "equivalence": {
+    "method": "bootstrap_interval_containment_screen",
+    "margin": "absolute_metric_units",
+    "margin_preregistered": true,
+    "equivalent_condition": "lower > -margin AND upper < margin",
+    "failure_label": "not_established",
+    "not_a_tost_p_value": true,
+    "non_significance_does_not_imply_equivalence": true
+  },
+  "multiplicity": {
+    "method": "Holm_step_down",
+    "family_membership_preregistered": true,
+    "adjusted_p_values_monotone_in_sorted_raw_p_order": true
+  },
+  "prohibited_inference": [
+    "pair_by_array_position",
+    "treat_ticks_or_agents_as_independent_replicates",
+    "call_non_significance_equivalence",
+    "change_historical_verdicts_without_separate_reanalysis"
+  ]
+}
