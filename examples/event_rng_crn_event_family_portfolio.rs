@@ -312,7 +312,7 @@ fn run_case(beta_u: f64, beta_v: f64) -> Case {
 
     let seed = 0x4556_4641_4d49_4c59_u64
         ^ beta_u.to_bits()
-        ^ beta_v.rotate_left(23).to_bits();
+        ^ beta_v.to_bits().rotate_left(23);
 
     Case {
         beta_u,
