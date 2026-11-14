@@ -4,9 +4,9 @@ The passport extends Cargo's JSON artifact capture into a content-addressed evid
 
 ## Capture boundary
 
-The builder runs \`cargo build --locked --all-targets --offline\` with a dedicated target directory and the Cargo 1.100 build directory configured separately using \`CARGO_BUILD_BUILD_DIR\`. It warms the locked dependency graph before entering offline mode.
+The builder verifies the exact requested rustc and Cargo versions, warms the locked dependency graph with `cargo fetch --locked`, then runs `cargo build --locked --all-targets --offline` with a fresh dedicated target directory and Cargo 1.100's separate build directory configured through `CARGO_BUILD_BUILD_DIR`. Rustc wrappers are explicitly disabled for this capture lane.
 
-Only Cargo \`compiler-artifact\` JSON messages are used to discover final artifacts. The implementation does not scan or guess private Cargo build-directory paths. Every Cargo-reported filename is resolved and required to remain under the isolated target directory.
+Only Cargo `compiler-artifact` JSON messages are used to discover final artifacts. The implementation does not scan or guess private Cargo build-directory paths. Every Cargo-reported filename is resolved and required to remain under the isolated target directory.
 
 ## Identity recorded
 
@@ -15,7 +15,9 @@ Only Cargo \`compiler-artifact\` JSON messages are used to discover final artifa
 - The manifest path and digest and the nearest applicable Cargo.lock path and digest.
 - Cargo metadata, Cargo JSON messages, diagnostics, and compiler artifact manifest digests.
 - Workspace and Cargo-home config digests when those config files exist.
-- Effective rustflags and encoded rustflags.
+- Effective rustflags and encoded rustflags, including the Cargo-specific rustflags setting.
+- Explicitly disabled rustc and workspace rustc wrappers for this direct-compiler capture lane.
+- A fresh output directory, a fresh target directory, and a separate intermediate build directory.
 - For each reported compiler artifact: package ID, target, profile, fresh flag, executable flag, relative file path, SHA-256 and byte size.
 
 ## Verification
