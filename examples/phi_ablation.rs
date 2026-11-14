@@ -18,12 +18,17 @@
 //! branch returned the constant 0.5 and duplicated CONSTANT exactly; it has
 //! been removed rather than reported as an independent scientific condition.
 
+use std::collections::BTreeMap;
+
 use nalgebra::SVector;
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::event_rng::{
     registry, EventAddress, SubjectId,
 };
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
+use symtropy_consciousness_physics::paired_inference::{
+    bootstrap_mean_interval, pair_by_seed, summarize_paired, BootstrapConfig, SeededValue,
+};
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
@@ -70,6 +75,24 @@ impl ScalarControl {
 
 struct RunResult { clustering: f64, alive: usize, avg_energy: f64 }
 
+#[derive(Default)]
+struct ConditionSamples {
+    clustering: Vec<SeededValue>,
+    alive: Vec<SeededValue>,
+    energy: Vec<SeededValue>,
+}
+
+impl ConditionSamples {
+    fn values(&self, metric: &str) -> &[SeededValue] {
+        match metric {
+            "clustering" => &self.clustering,
+            "alive" => &self.alive,
+            "energy" => &self.energy,
+            _ => panic!("unknown scalar-ablation metric: {metric}"),
+        }
+    }
+}
+
 const PHI_ABLATION_NAMESPACE: u64 = 0x5048_495f_4142_4c31;
 
 fn legacy_random_control(tick: u64, agent_idx: usize) -> f64 {
@@ -97,6 +120,92 @@ fn event_random_control(replicate_seed: u64, tick: u64, agent_idx: usize) -> f64
         0,
     )
     .uniform_open01(0)
+}
+
+fn emit_paired_analysis_receipts(
+    samples_by_condition: &BTreeMap<&'static str, ConditionSamples>,
+) {
+    // These contrasts are fixed before examining the result. The main target
+    // is whether the replicate-keyed random control differs from the legacy
+    // seed-invariant control; constant and entropy comparisons are secondary.
+    const COMPARISONS: [(&str, &str); 3] = [
+        ("RANDOM_LEGACY", "RANDOM_EVENT"),
+        ("CONST_0.5", "RANDOM_EVENT"),
+        ("CONST_0.5", "ENTROPY_PROXY"),
+    ];
+    const OUTCOMES: [&str; 3] = ["clustering", "alive", "energy"];
+    const BOOTSTRAP_REPLICATES: usize = 20_000;
+    const BOOTSTRAP_SEED_BASE: u64 = 0x5343_414c_4152_0001;
+
+    println!("paired_analysis_unit=complete_seed_replicate");
+    println!("paired_analysis_key=actual_seed_value");
+    println!("paired_analysis_estimand=treatment_minus_control");
+    println!("paired_bootstrap_method=percentile_resample_whole_seed_pairs");
+    println!("paired_bootstrap_replicates={BOOTSTRAP_REPLICATES}");
+    println!("paired_p_values=NOT_EVALUATED_SIGN_EXCHANGEABILITY_UNQUALIFIED");
+    println!("paired_equivalence=NOT_EVALUATED_NO_PREREGISTERED_MARGIN");
+
+    for (comparison_index, (control_name, treatment_name)) in
+        COMPARISONS.iter().copied().enumerate()
+    {
+        let control = samples_by_condition
+            .get(control_name)
+            .expect("preregistered control condition must be present");
+        let treatment = samples_by_condition
+            .get(treatment_name)
+            .expect("preregistered treatment condition must be present");
+
+        for (metric_index, metric_name) in OUTCOMES.iter().copied().enumerate() {
+            let pairs = pair_by_seed(
+                control.values(metric_name),
+                treatment.values(metric_name),
+            )
+            .expect("conditions must contain the same unique finite seed keys");
+            let summary = summarize_paired(&pairs)
+                .expect("non-empty matched seed pairs must be summarizable");
+            let bootstrap_seed =
+                BOOTSTRAP_SEED_BASE + (comparison_index * OUTCOMES.len() + metric_index) as u64;
+            let interval = bootstrap_mean_interval(
+                &pairs,
+                BootstrapConfig {
+                    replicates: BOOTSTRAP_REPLICATES,
+                    confidence_level: 0.95,
+                    rng_seed: bootstrap_seed,
+                },
+            )
+            .expect("fixed bootstrap contract must be valid");
+
+            let seed_ids = pairs
+                .iter()
+                .map(|pair| pair.seed_id.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            let cohens_dz = summary
+                .cohens_dz
+                .map(|value| format!("{value:.17e}"))
+                .unwrap_or_else(|| "null".to_string());
+
+            // JSON lines are append-only analysis receipts. No p-value or
+            // equivalence verdict is emitted without their design assumptions.
+            println!(
+                "PAIRED_ANALYSIS_JSON={{\"schema\":\"luminous.symtropy.paired-ablation-receipt.v0.1\",\"control\":\"{control_name}\",\"treatment\":\"{treatment_name}\",\"metric\":\"{metric_name}\",\"independent_unit\":\"complete_seed_replicate\",\"pairing_key\":\"actual_seed_value\",\"estimand\":\"treatment_minus_control\",\"seed_ids\":[{seed_ids}],\"n\":{},\"mean_difference\":{:.17e},\"median_difference\":{:.17e},\"sample_standard_deviation\":{},\"standard_error\":{},\"cohens_dz\":{},\"bootstrap\":{{\"method\":\"percentile_whole_pair_resampling\",\"confidence_level\":0.95,\"lower\":{:.17e},\"upper\":{:.17e},\"replicates\":{},\"rng\":\"SplitMix64_non_cryptographic\",\"rng_seed\":{}}},\"sign_flip\":{{\"status\":\"not_evaluated\",\"reason\":\"sign_exchangeability_or_randomized_pair_assignment_not_established\"}},\"equivalence\":{{\"status\":\"not_evaluated\",\"reason\":\"no_preregistered_metric_specific_margin\"}}}}",
+                summary.n,
+                summary.mean_difference,
+                summary.median_difference,
+                summary.sample_standard_deviation
+                    .map(|value| format!("{value:.17e}"))
+                    .unwrap_or_else(|| "null".to_string()),
+                summary.standard_error
+                    .map(|value| format!("{value:.17e}"))
+                    .unwrap_or_else(|| "null".to_string()),
+                cohens_dz,
+                interval.lower,
+                interval.upper,
+                interval.replicates,
+                interval.rng_seed,
+            );
+        }
+    }
 }
 
 fn run(metric: ScalarControl, seed: u64) -> RunResult {
@@ -230,27 +339,57 @@ fn main() {
     println!("{:<12} {:<12} {:<12} {:<12} {:<12}", "Metric", "Clustering", "95% CI", "Alive", "Energy");
     println!("{}", "─".repeat(60));
 
+    let mut samples_by_condition = BTreeMap::<&'static str, ConditionSamples>::new();
+
     for metric in &metrics {
-        let mut clusterings = Vec::new();
-        let mut alives = Vec::new();
-        let mut energies = Vec::new();
+        let mut samples = ConditionSamples::default();
 
         for s in 0..SEEDS {
-            let r = run(*metric, 42 + s as u64 * 997);
-            clusterings.push(r.clustering);
-            alives.push(r.alive as f64);
-            energies.push(r.avg_energy);
+            let seed_id = 42 + s as u64 * 997;
+            let result = run(*metric, seed_id);
+            samples.clustering.push(SeededValue {
+                seed_id,
+                value: result.clustering,
+            });
+            samples.alive.push(SeededValue {
+                seed_id,
+                value: result.alive as f64,
+            });
+            samples.energy.push(SeededValue {
+                seed_id,
+                value: result.avg_energy,
+            });
         }
+
+        let clusterings = samples
+            .clustering
+            .iter()
+            .map(|sample| sample.value)
+            .collect::<Vec<_>>();
+        let alives = samples
+            .alive
+            .iter()
+            .map(|sample| sample.value)
+            .collect::<Vec<_>>();
+        let energies = samples
+            .energy
+            .iter()
+            .map(|sample| sample.value)
+            .collect::<Vec<_>>();
 
         let mean_c = clusterings.iter().sum::<f64>() / SEEDS as f64;
         let std_c = (clusterings.iter().map(|x| (x - mean_c).powi(2)).sum::<f64>() / (SEEDS as f64 - 1.0)).sqrt();
-        let ci = 1.96 * std_c / (SEEDS as f64).sqrt(); // 95% CI
+        let ci = 1.96 * std_c / (SEEDS as f64).sqrt(); // Descriptive per-condition normal interval.
         let mean_a = alives.iter().sum::<f64>() / SEEDS as f64;
         let mean_e = energies.iter().sum::<f64>() / SEEDS as f64;
 
         println!("{:<12} {:<12.2} ±{:<10.2} {:<12.1} {:<12.1}",
             metric.name(), mean_c, ci, mean_a, mean_e);
+
+        samples_by_condition.insert(metric.name(), samples);
     }
+
+    emit_paired_analysis_receipts(&samples_by_condition);
 
     println!("\n═══════════════════════════════════════════════════════");
     println!("No equation-level Phi measurement is included in this harness.");
