@@ -1,0 +1,51 @@
+{
+  "schema": "luminous.symtropy.dynamic-entity-lineage.v0.1",
+  "status": "deterministic_lineage_registry_prototype",
+  "birth_key": [
+    "world_namespace_u64_nonzero",
+    "sorted_parent_subject_ids_u64",
+    "semantic_birth_event_id_u128_nonzero",
+    "offspring_slot_u32"
+  ],
+  "derivation": {
+    "mixer": "philox4x64-10",
+    "namespace": "separate_lineage_domain",
+    "dynamic_marker_bit": 63,
+    "cryptographic": false
+  },
+  "registry": {
+    "key_to_subject": true,
+    "subject_to_key_collision_detection": true,
+    "static_subject_reservation_required": true,
+    "shared_across_matched_scenarios": true,
+    "idempotent_resolution": true,
+    "collision_response": "fail_closed",
+    "complete_birth_key_receipt_export": true,
+    "receipt_order": "ascending_subject_id"
+  },
+  "tests": [
+    "parent_order_canonicalization",
+    "same_birth_deterministic_across_registries",
+    "idempotent_resolution",
+    "unrelated_birth_order_invariance",
+    "identity_dimension_sensitivity",
+    "static_subject_collision_rejected",
+    "dynamic_birth_collision_rejected",
+    "late_static_reservation_rejected",
+    "duplicate_parent_rejected",
+    "zero_namespace_rejected",
+    "assignment_receipts_complete_and_insertion_order_independent"
+  ],
+  "not_implemented": [
+    "automatic_model_birth_site_instrumentation",
+    "persistent_lineage_receipt_serialization",
+    "cross_process_registry_merge",
+    "real_symtropy_dynamic_entity_migration"
+  ],
+  "nonclaims": [
+    "not_cryptographic",
+    "not_a_proof_of_scientifically_correct_parentage",
+    "no_historical_outputs_changed",
+    "no_simulation_call_site_changed"
+  ]
+}

@@ -25,7 +25,7 @@ That semantic decision belongs to the model. A false match can be more damaging 
 
 ### Dynamic entity identity
 
-Dynamic entities (births, particles, vehicles, households, buildings, jobs, spawned agents) need a stable lineage identity, not merely "the next integer allocated".
+Dynamic entities (births, particles, vehicles, households, buildings, jobs, spawned agents) need a stable lineage identity, not merely "the next integer allocated". The opt-in prototype in src/event_lineage.rs now implements deterministic BirthKey derivation and collision-checked assignment for this purpose.
 
 The recommended conceptual birth key is:
 

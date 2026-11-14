@@ -11,6 +11,7 @@ This is an opt-in research track. It does not replace Symtropy's historical LCG 
 5. **Causal benchmark:** analytical counterfactual model with a positive-covariance CRN case and a negative-covariance control.
 6. **Throughput benchmark:** raw Philox, address construction, random-access scalar, cached sequential scalar, cached open-uniform and historical LCG helper measured separately.
 7. **Independent reference parity:** pinned Random123 C++ differential comparison across raw and event-address-derived counter/key pairs.
+8. **Dynamic lineage prototype:** canonical BirthKey derivation, static/dynamic collision registry and deterministic full-provenance assignment export.
 
 ## Evidence currently available
 
@@ -63,6 +64,7 @@ These are shared-runner microbenchmarks, not same-host Random123 performance com
 - [SOTA qualification contract](sota-qualification-contract-v0.1.json)
 - [Throughput benchmark contract](throughput-contract-v0.1.json)
 - [Random123 reference parity contract](reference-parity-contract-v0.1.json)
+- [Dynamic entity lineage contract](dynamic-entity-lineage-contract-v0.1.json)
 
 Research documents are in docs/research:
 - EVENT_KEYED_RNG_IMPLEMENTATION_V0_1.md
@@ -73,6 +75,7 @@ Research documents are in docs/research:
 - EVENT_KEYED_RNG_SOTA_QUALIFICATION_V0_1.md
 - EVENT_RNG_THROUGHPUT_BENCHMARK_V0_1.md
 - EVENT_RNG_RANDOM123_REFERENCE_PARITY_V0_1.md
+- EVENT_DYNAMIC_ENTITY_LINEAGE_V0_1.md
 
 ## Not yet qualified
 
@@ -81,7 +84,7 @@ Research documents are in docs/research:
 - Rust-versus-Random123 C reference throughput (parity is now qualified on the finite corpus; throughput comparison remains unrun).
 - Aarch64 and cross-language parity.
 - GPU implementation or qualification.
-- Dynamic-entity genealogical ID allocation.
+- Integration of the dynamic-entity lineage prototype into real model birth sites; automatic instrumentation remains unimplemented.
 - Population of a model-owned event registry.
 - Integration into actual Symtropy simulation call sites.
 - Same-host application performance or end-to-end estimator improvement in a real model.
@@ -91,4 +94,4 @@ Do not treat the fact that Random123's published implementation passed statistic
 
 ## Execution
 
-The current modules are opt-in and independently testable. Historical RNG call sites remain unchanged until a model-owned sharing registry, dynamic-lineage policy, real trace capture and application-specific validation are reviewed.
+The current modules are opt-in and independently testable. A prototype lineage registry can derive and collision-check dynamic IDs from canonical birth provenance, but no historical Symtropy birth sites are instrumented. Historical RNG call sites remain unchanged until model-owned sharing policies, persistent lineage receipts, real trace capture and application-specific validation are reviewed.

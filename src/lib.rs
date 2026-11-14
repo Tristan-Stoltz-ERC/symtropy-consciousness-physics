@@ -26,6 +26,7 @@ pub mod experiment_seed;
 pub mod event_rng;
 pub mod event_alignment;
 pub mod event_identity;
+pub mod event_lineage;
 pub mod fep_gradient;
 pub mod harmony_field;
 pub mod prey;

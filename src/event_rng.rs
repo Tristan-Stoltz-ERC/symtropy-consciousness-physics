@@ -101,6 +101,18 @@ impl SubjectId {
         Ok(Self(((low as u64) << 32) | high as u64))
     }
 
+    /// Construct a nonzero internal subject ID from a checked lineage derivation.
+    ///
+    /// This is crate-visible only; public callers must use stable agent/pair
+    /// constructors or the collision-checked LineageIdRegistry.
+    pub(crate) const fn from_nonzero_raw(raw: u64) -> Option<Self> {
+        if raw == 0 {
+            None
+        } else {
+            Some(Self(raw))
+        }
+    }
+
     pub const fn raw(self) -> u64 {
         self.0
     }
