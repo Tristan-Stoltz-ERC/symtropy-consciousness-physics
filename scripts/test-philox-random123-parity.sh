@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-TOOLCHAIN="\${1:-1.100.0}"
-CORPUS_COUNT="\${2:-4096}"
+TOOLCHAIN="${1:-1.100.0}"
+CORPUS_COUNT="${2:-4096}"
 ROOT="$(git rev-parse --show-toplevel)"
 RANDOM123_COMMIT="ff4443af61194bb57a042cd4945f2c73bdf1d0dd"
 WORK="$(mktemp -d)"
