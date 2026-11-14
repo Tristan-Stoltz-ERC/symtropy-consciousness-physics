@@ -314,7 +314,47 @@ fn run(metric: ScalarControl, seed: u64) -> RunResult {
     RunResult { clustering: tn / AGENTS as f64, alive, avg_energy: avg_e }
 }
 
+fn synthetic_receipt_samples() -> BTreeMap<&'static str, ConditionSamples> {
+    const CONDITIONS: [&str; 5] = [
+        "ENTROPY_PROXY",
+        "RANDOM_LEGACY",
+        "RANDOM_EVENT",
+        "CONST_0.5",
+        "ZERO",
+    ];
+
+    let mut samples_by_condition = BTreeMap::new();
+    for (condition_index, condition_name) in CONDITIONS.iter().copied().enumerate() {
+        let condition_offset = condition_index as f64 * 0.25;
+        let mut samples = ConditionSamples::default();
+        for seed_index in 0..SEEDS {
+            let seed_id = 42 + seed_index as u64 * 997;
+            let replicate = seed_index as f64;
+            samples.clustering.push(SeededValue {
+                seed_id,
+                value: 1.0 + replicate * 0.125 + condition_offset,
+            });
+            samples.alive.push(SeededValue {
+                seed_id,
+                value: (seed_index % 7) as f64 + condition_offset,
+            });
+            samples.energy.push(SeededValue {
+                seed_id,
+                value: 100.0 + replicate * 0.75 + condition_offset * 2.0,
+            });
+        }
+        samples_by_condition.insert(condition_name, samples);
+    }
+    samples_by_condition
+}
+
 fn main() {
+    if std::env::args().any(|argument| argument == "--receipt-smoke") {
+        let synthetic = synthetic_receipt_samples();
+        emit_paired_analysis_receipts(&synthetic);
+        return;
+    }
+
     println!("╔══════════════════════════════════════════════════════╗");
     println!("║  SCALAR CONTROL ABLATION: Event-addressed randomness ║");
     println!("╚══════════════════════════════════════════════════════╝\n");
