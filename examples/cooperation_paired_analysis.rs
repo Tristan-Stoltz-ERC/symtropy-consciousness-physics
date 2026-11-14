@@ -38,7 +38,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     let sign_flip_draws = parse_usize_option(&args, "--sign-flip-draws", 99_999)?;
     let sign_flip_seed = parse_u64_option(&args, "--sign-flip-seed", 0x5349_474E_464C_4950)?;
 
-    let margin = args.get("--equivalence-margin")
+    let margin = args
+        .get("--equivalence-margin")
         .map(|value| parse_finite(value, "--equivalence-margin"))
         .transpose()?;
     let rationale = args.get("--margin-rationale");
@@ -64,7 +65,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     }
     let condition_column = *columns.get("condition").ok_or("missing condition column")?;
     let seed_column = *columns.get("seed").ok_or("missing seed column")?;
-    let metric_column = *columns.get(metric.as_str())
+    let metric_column = *columns
+        .get(metric)
         .ok_or_else(|| format!("unknown metric column {metric}"))?;
 
     let mut control = Vec::new();
@@ -79,15 +81,19 @@ fn run() -> Result<(), Box<dyn Error>> {
         if fields.len() != headers.len() {
             return Err(format!(
                 "CSV line {} has {} fields; expected {}",
-                line_index + 2, fields.len(), headers.len()
-            ).into());
+                line_index + 2,
+                fields.len(),
+                headers.len()
+            )
+            .into());
         }
         data_rows += 1;
         let condition = fields[condition_column];
         if condition != control_name && condition != treatment_name {
             continue;
         }
-        let seed_id = fields[seed_column].parse::<u64>()
+        let seed_id = fields[seed_column]
+            .parse::<u64>()
             .map_err(|_| format!("CSV line {} has invalid seed key", line_index + 2))?;
         let value = parse_finite(fields[metric_column], "metric value")
             .map_err(|error| format!("CSV line {}: {error}", line_index + 2))?;
@@ -131,7 +137,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         r#"{"status":"not_evaluated","reason":"no preregistered margin supplied"}"#.to_string()
     };
 
-    let seeds = pairs.iter().map(|pair| pair.seed_id.to_string()).collect::<Vec<_>>().join(",");
+    let seeds = pairs
+        .iter()
+        .map(|pair| pair.seed_id.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
     let path_json = json_string(&input_path.to_string_lossy());
     println!(
         concat!(
@@ -187,7 +197,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         sign_flip.p_value,
         sign_flip.exact,
         sign_flip.permutations_evaluated,
-        sign_flip.rng_seed.map(|value| value.to_string()).unwrap_or_else(|| "null".to_string()),
+        sign_flip
+            .rng_seed
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "null".to_string()),
         bootstrap.confidence_level,
         bootstrap.lower,
         bootstrap.upper,
@@ -213,7 +226,9 @@ fn parse_args() -> Result<BTreeMap<String, String>, Box<dyn Error>> {
         if !flag.starts_with("--") {
             return Err(format!("unexpected argument {flag}").into());
         }
-        let value = args.next().ok_or_else(|| format!("missing value for {flag}"))?;
+        let value = args
+            .next()
+            .ok_or_else(|| format!("missing value for {flag}"))?;
         if parsed.insert(flag.clone(), value).is_some() {
             return Err(format!("duplicate argument {flag}").into());
         }
@@ -221,10 +236,16 @@ fn parse_args() -> Result<BTreeMap<String, String>, Box<dyn Error>> {
     for key in parsed.keys() {
         if !matches!(
             key.as_str(),
-            "--input" | "--control" | "--treatment" | "--metric"
-                | "--bootstrap-replicates" | "--bootstrap-seed"
-                | "--sign-flip-draws" | "--sign-flip-seed"
-                | "--equivalence-margin" | "--margin-rationale"
+            "--input"
+                | "--control"
+                | "--treatment"
+                | "--metric"
+                | "--bootstrap-replicates"
+                | "--bootstrap-seed"
+                | "--sign-flip-draws"
+                | "--sign-flip-seed"
+                | "--equivalence-margin"
+                | "--margin-rationale"
         ) {
             return Err(format!("unknown argument {key}").into());
         }
@@ -232,10 +253,7 @@ fn parse_args() -> Result<BTreeMap<String, String>, Box<dyn Error>> {
     Ok(parsed)
 }
 
-fn required<'a>(
-    args: &'a BTreeMap<String, String>,
-    name: &str,
-) -> Result<&'a str, Box<dyn Error>> {
+fn required<'a>(args: &'a BTreeMap<String, String>, name: &str) -> Result<&'a str, Box<dyn Error>> {
     args.get(name)
         .map(String::as_str)
         .ok_or_else(|| format!("missing required argument {name}").into())
@@ -273,12 +291,16 @@ fn parse_u64(value: &str, name: &str) -> Result<u64, String> {
     if let Some(hex) = value.strip_prefix("0x") {
         u64::from_str_radix(hex, 16).map_err(|_| format!("invalid {name}: {value}"))
     } else {
-        value.parse::<u64>().map_err(|_| format!("invalid {name}: {value}"))
+        value
+            .parse::<u64>()
+            .map_err(|_| format!("invalid {name}: {value}"))
     }
 }
 
 fn parse_finite(value: &str, name: &str) -> Result<f64, String> {
-    let parsed = value.parse::<f64>().map_err(|_| format!("invalid {name}: {value}"))?;
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| format!("invalid {name}: {value}"))?;
     if !parsed.is_finite() {
         return Err(format!("{name} must be finite"));
     }
@@ -301,7 +323,9 @@ fn json_string(value: &str) -> String {
             '\n' => output.push_str("\\n"),
             '\r' => output.push_str("\\r"),
             '\t' => output.push_str("\\t"),
-            character if character.is_control() => output.push_str(&format!("\\u{:04x}", character as u32)),
+            character if character.is_control() => {
+                output.push_str(&format!("\\u{:04x}", character as u32))
+            }
             character => output.push(character),
         }
     }
@@ -310,5 +334,7 @@ fn json_string(value: &str) -> String {
 }
 
 fn optional_number(value: Option<f64>) -> String {
-    value.map(|number| format!("{number:.17e}")).unwrap_or_else(|| "null".to_string())
+    value
+        .map(|number| format!("{number:.17e}"))
+        .unwrap_or_else(|| "null".to_string())
 }
