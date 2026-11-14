@@ -18,6 +18,7 @@ pub const MAX_EXPERIMENT_SEEDS: usize = 10_000;
 pub struct ExperimentSeedSchedule {
     indices: Vec<u64>,
     seeds: Vec<u64>,
+    overridden: bool,
 }
 
 impl ExperimentSeedSchedule {
@@ -42,6 +43,7 @@ impl ExperimentSeedSchedule {
         start: Option<&str>,
         count: Option<&str>,
     ) -> Result<Self, String> {
+        let overridden = explicit.is_some() || start.is_some() || count.is_some();
         if default_count == 0 || default_count > MAX_EXPERIMENT_SEEDS {
             return Err(format!(
                 "default seed count must be in 1..={}, got {}",
@@ -124,7 +126,7 @@ impl ExperimentSeedSchedule {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Self { indices, seeds })
+        Ok(Self { indices, seeds, overridden })
     }
 
     /// Logical indices in execution order.
@@ -143,6 +145,11 @@ impl ExperimentSeedSchedule {
 
     pub fn is_empty(&self) -> bool {
         self.seeds.is_empty()
+    }
+
+    /// True when a non-default environment selector was supplied.
+    pub fn is_overridden(&self) -> bool {
+        self.overridden
     }
 
     /// Stable textual identity for run receipts and benchmark manifests.
@@ -165,6 +172,7 @@ mod tests {
         let schedule = ExperimentSeedSchedule::from_config(4, None, None, None).unwrap();
         assert_eq!(schedule.indices(), &[0, 1, 2, 3]);
         assert_eq!(schedule.seeds(), &[42, 1_039, 2_036, 3_033]);
+        assert!(!schedule.is_overridden());
     }
 
     #[test]
@@ -173,6 +181,8 @@ mod tests {
         let holdout = ExperimentSeedSchedule::from_config(20, None, Some("10"), Some("10")).unwrap();
         assert_eq!(train.indices(), &(0_u64..10).collect::<Vec<_>>());
         assert_eq!(holdout.indices(), &(10_u64..20).collect::<Vec<_>>());
+        assert!(train.is_overridden());
+        assert!(holdout.is_overridden());
         assert!(train.indices().iter().all(|index| !holdout.indices().contains(index)));
     }
 
