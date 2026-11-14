@@ -75,6 +75,12 @@ if bash "$SCRIPT_DIR/verify-cargo-artifact-passport.sh" "$OUTPUT" "$ROOT" >/dev/
   exit 1
 fi
 printf 'rlib-content\n' > "$OUTPUT/target/debug/deps/libfixture-123.rlib"
+printf 'metadata-tamper\n' >> "$OUTPUT/cargo-metadata.json"
+if bash "$SCRIPT_DIR/verify-cargo-artifact-passport.sh" "$OUTPUT" "$ROOT" >/dev/null 2>&1; then
+  echo "verifier accepted changed Cargo metadata" >&2
+  exit 1
+fi
+printf '{"packages":[],"workspace_members":[]}\n' > "$OUTPUT/cargo-metadata.json"
 printf 'lock-v2\n' > "$ROOT/Cargo.lock"
 if bash "$SCRIPT_DIR/verify-cargo-artifact-passport.sh" "$OUTPUT" "$ROOT" >/dev/null 2>&1; then
   echo "verifier accepted changed lockfile" >&2
