@@ -65,9 +65,10 @@ PGO_ROOT="$OUT/target-pgo"
 mkdir -p "$OUT"/{baseline,instrumented,pgo,logs,metadata} "$PROFILE_DIR"
 
 export CARGO_INCREMENTAL=0
-export CARGO_NET_OFFLINE=true
 export CARGO_TERM_COLOR=never
-rustup run "$TOOLCHAIN" cargo fetch --locked
+# Warm the exact locked graph before entering offline measurement mode.
+env -u CARGO_NET_OFFLINE rustup run "$TOOLCHAIN" cargo fetch --locked
+export CARGO_NET_OFFLINE=true
 rustup run "$TOOLCHAIN" cargo metadata --locked --format-version 1 --no-deps > "$OUT/metadata/cargo-metadata.json"
 CARGO_METADATA_SHA="$(sha256sum "$OUT/metadata/cargo-metadata.json" | awk '{print $1}')"
 

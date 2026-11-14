@@ -3,6 +3,12 @@ on:
   pull_request:
     paths:
       - "scripts/run-rust-pgo-instrumented.sh"
+      - "scripts/run-rust-pgo-seed-holdout.sh"
+      - "src/experiment_seed.rs"
+      - "src/lib.rs"
+      - "examples/jphi_convergence.rs"
+      - "examples/gradient_replacement.rs"
+      - "examples/cooperation_decomposition.rs"
       - "scripts/run-rust-sample-pgo.sh"
       - "scripts/seal-rust-pgo-evidence.sh"
       - "scripts/verify-rust-pgo-evidence.sh"
@@ -14,7 +20,7 @@ on:
       mode:
         description: PGO method to qualify
         type: choice
-        options: [instrumentation, sample]
+        options: [instrumentation, sample, seed-holdout]
         default: instrumentation
         required: true
       train_example:
@@ -22,6 +28,22 @@ on:
         type: choice
         options: [jphi_convergence, gradient_replacement, cooperation_decomposition]
         default: jphi_convergence
+        required: true
+      seed_holdout_example:
+        description: Same-program workload for disjoint seed-holdout PGO
+        type: choice
+        options: [jphi_convergence, gradient_replacement, cooperation_decomposition]
+        default: jphi_convergence
+        required: true
+      train_seed_indices:
+        description: Comma-separated logical seed indices used only for profile collection
+        type: string
+        default: "0,1,2,3,4,5,6,7,8,9"
+        required: true
+      holdout_seed_indices:
+        description: Disjoint comma-separated logical seed indices used only for evaluation
+        type: string
+        default: "10,11,12,13,14,15,16,17,18,19"
         required: true
       build_repeats:
         description: Independent fresh-target paired build trials
@@ -57,7 +79,15 @@ jobs:
           set -euo pipefail
           jq -e '.schema == "luminous.rust-pgo-evidence-passport.v0.1"' benchmarks/rust-pgo/protocol-v0.1.json
           bash -n scripts/run-rust-pgo-instrumented.sh
+          bash -n scripts/run-rust-pgo-seed-holdout.sh
           bash -n scripts/run-rust-sample-pgo.sh
+          grep -F 'pub const DEFAULT_SEED_BASE: u64 = 42;' src/experiment_seed.rs
+          grep -F 'pub const DEFAULT_SEED_STRIDE: u64 = 997;' src/experiment_seed.rs
+          grep -F 'default_schedule_preserves_historical_seed_values' src/experiment_seed.rs
+          grep -F 'for &seed in seed_schedule.seeds()' examples/jphi_convergence.rs
+          grep -F 'for &seed in seed_schedule.seeds()' examples/gradient_replacement.rs
+          grep -F 'for &seed in seed_schedule.seeds()' examples/cooperation_decomposition.rs
+          grep -F 'performance_measurement_scope=heldout_seed_indices_only' scripts/run-rust-pgo-seed-holdout.sh
           bash -n scripts/seal-rust-pgo-evidence.sh
           bash -n scripts/verify-rust-pgo-evidence.sh
           grep -F -- 'PASS_EVIDENCE_INTEGRITY_ONLY' scripts/verify-rust-pgo-evidence.sh
@@ -168,3 +198,85 @@ jobs:
           path: ${{ runner.temp }}/symtropy-sample-pgo/
           if-no-files-found: warn
           retention-days: 30
+
+  same-program-seed-holdout-pgo:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'seed-holdout'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact Rust/Cargo and LLVM profile tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup component add llvm-tools-preview --toolchain 1.100.0
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+          rustup run 1.100.0 rustc -Vv
+          rustup run 1.100.0 cargo -Vv
+      - name: Run same-program disjoint seed-holdout PGO tournament
+        env:
+          RUST_TOOLCHAIN: 1.100.0
+          PGO_SEED_HOLDOUT_EXAMPLE: ${{ inputs.seed_holdout_example }}
+          PGO_TRAIN_SEED_INDICES: ${{ inputs.train_seed_indices }}
+          PGO_HOLDOUT_SEED_INDICES: ${{ inputs.holdout_seed_indices }}
+          PGO_BUILD_REPEATS: ${{ inputs.build_repeats }}
+          PGO_RUN_REPEATS: ${{ inputs.repeats }}
+          PGO_RESULT_ROOT: ${{ runner.temp }}/symtropy-pgo-seed-holdout
+        run: |
+          set -euo pipefail
+          bash scripts/run-rust-pgo-seed-holdout.sh
+      - name: Verify sealed seed-holdout evidence against exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULT_DIR="$(find "${{ runner.temp }}/symtropy-pgo-seed-holdout" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$RESULT_DIR"
+          bash scripts/verify-rust-pgo-evidence.sh "$RESULT_DIR" "$GITHUB_WORKSPACE"
+      - name: Upload raw same-program seed-holdout evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rust-1.100-same-program-seed-holdout-${{ github.sha }}
+          path: ${{ runner.temp }}/symtropy-pgo-seed-holdout/
+          if-no-files-found: warn
+          retention-days: 30
+
+  seed-schedule-qualification:
+    if: github.event_name == 'pull_request'
+    name: Exact seed schedule contract (Rust 1.100.0)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact Rust/Cargo and rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal --component rustfmt
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+      - name: Format the seed schedule and selectable experiment programs
+        run: |
+          set -euo pipefail
+          rustup run 1.100.0 rustfmt --edition 2021 --check \
+            src/experiment_seed.rs \
+            examples/jphi_convergence.rs \
+            examples/gradient_replacement.rs \
+            examples/cooperation_decomposition.rs
+      - name: Run the default and disjoint-index seed schedule unit tests
+        run: cargo +1.100.0 test --locked --lib experiment_seed::tests
+      - name: Compile all three supported seed-selectable experiment examples
+        run: |
+          cargo +1.100.0 check --locked --example jphi_convergence
+          cargo +1.100.0 check --locked --example gradient_replacement
+          cargo +1.100.0 check --locked --example cooperation_decomposition
+      - name: Enforce lockfile immutability
+        run: git diff --exit-code -- Cargo.lock

@@ -22,6 +22,7 @@ pub mod coupling;
 pub mod curvature;
 pub mod dimensional_leakage;
 pub mod energy;
+pub mod experiment_seed;
 pub mod fep_gradient;
 pub mod harmony_field;
 pub mod prey;
