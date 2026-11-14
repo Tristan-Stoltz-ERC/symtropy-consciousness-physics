@@ -327,11 +327,7 @@ fn run_case(beta_u: f64, beta_v: f64) -> Case {
             bootstrap_ratio_interval(&global, &all_independent, seed + 1),
             bootstrap_ratio_interval(&per_family, &all_independent, seed + 2),
         ],
-        portfolio_to_global_interval: bootstrap_ratio_interval(
-            &per_family,
-            &global,
-            seed + 3,
-        ),
+        portfolio_to_global_interval: bootstrap_ratio_interval(&per_family, &global, seed + 3),
         theoretical_shared_ratio: theoretical_shared_variance(beta_u, beta_v)
             / theoretical_independent_variance(beta_u, beta_v),
         theoretical_portfolio_ratio: theoretical_portfolio_variance(beta_u, beta_v)
