@@ -81,6 +81,7 @@ struct CaseResult {
     known_ate: f64,
     training_covariance: f64,
     theoretical_covariance: f64,
+    theoretical_shared_ratio: f64,
     selected_policy: CouplingPolicy,
     shared_mean: f64,
     independent_mean: f64,
@@ -284,6 +285,7 @@ fn run_case(beta: f64) -> CaseResult {
         known_ate,
         training_covariance,
         theoretical_covariance: theoretical_covariance(beta),
+        theoretical_shared_ratio: theoretical_variance_ratio(beta),
         selected_policy,
         shared_mean: sample_mean(&shared),
         independent_mean: sample_mean(&independent),
@@ -324,7 +326,7 @@ fn case_passes(result: CaseResult) -> bool {
 fn print_case(result: CaseResult) -> bool {
     let passed = case_passes(result);
     println!(
-        "CROSSFIT_JSON={{\"schema\":\"luminous.symtropy.crn-crossfit-coupling.v0.1\",\"beta\":{:.6},\"train_replicates\":{},\"holdout_replicates\":{},\"subjects_per_replicate\":{},\"known_ate\":{:.9},\"training_covariance\":{:.12e},\"theoretical_covariance\":{:.12e},\"selected_policy\":\"{}\",\"shared_holdout_mean\":{:.12e},\"independent_holdout_mean\":{:.12e},\"selected_holdout_mean\":{:.12e},\"shared_estimator_variance\":{:.12e},\"independent_estimator_variance\":{:.12e},\"selected_estimator_variance\":{:.12e},\"shared_to_independent_variance_ratio\":{:.9},\"selected_to_independent_variance_ratio\":{:.9},\"shared_ratio_bootstrap_95pct\":[{:.9},{:.9}],\"selected_ratio_bootstrap_95pct\":[{:.9},{:.9}],\"bootstrap_replicates\":{},\"pass\":{}}}",
+        "CROSSFIT_JSON={{\"schema\":\"luminous.symtropy.crn-crossfit-coupling.v0.1\",\"beta\":{:.6},\"train_replicates\":{},\"holdout_replicates\":{},\"subjects_per_replicate\":{},\"known_ate\":{:.9},\"training_covariance\":{:.12e},\"theoretical_covariance\":{:.12e},\"theoretical_shared_to_independent_variance_ratio\":{:.9},\"selected_policy\":\"{}\",\"shared_holdout_mean\":{:.12e},\"independent_holdout_mean\":{:.12e},\"selected_holdout_mean\":{:.12e},\"shared_estimator_variance\":{:.12e},\"independent_estimator_variance\":{:.12e},\"selected_estimator_variance\":{:.12e},\"shared_to_independent_variance_ratio\":{:.9},\"selected_to_independent_variance_ratio\":{:.9},\"shared_ratio_bootstrap_95pct\":[{:.9},{:.9}],\"selected_ratio_bootstrap_95pct\":[{:.9},{:.9}],\"bootstrap_replicates\":{},\"pass\":{}}}",
         result.beta,
         TRAIN_REPLICATES,
         HOLDOUT_REPLICATES,
@@ -332,6 +334,7 @@ fn print_case(result: CaseResult) -> bool {
         result.known_ate,
         result.training_covariance,
         result.theoretical_covariance,
+        result.theoretical_shared_ratio,
         result.selected_policy.label(),
         result.shared_mean,
         result.independent_mean,
