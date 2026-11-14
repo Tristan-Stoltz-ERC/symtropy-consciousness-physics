@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - "src/event_rng.rs"
+      - "src/event_lineage.rs"
       - "src/lib.rs"
       - "docs/research/EVENT_KEYED_RNG_IMPLEMENTATION_V0_1.md"
+      - "docs/research/EVENT_LINEAGE_RANDOMNESS_V0_1.md"
       - "benchmarks/event-rng/implementation-contract-v0.1.json"
+      - "benchmarks/event-rng/event-lineage-contract-v0.1.json"
       - ".github/workflows/event-keyed-rng-qualification.yml"
 
 permissions:
@@ -29,10 +32,13 @@ jobs:
           set -euo pipefail
           jq -e '.schema == "luminous.symtropy.event-keyed-rng-implementation.v0.1"' \
             benchmarks/event-rng/implementation-contract-v0.1.json
+          jq -e '.schema == "luminous.symtropy.event-lineage-rng.v0.1"' \
+            benchmarks/event-rng/event-lineage-contract-v0.1.json
           grep -F 'pub const EVENT_KEY_SCHEMA_VERSION: u32 = 1;' src/event_rng.rs
           grep -F 'pub const EVENT_RNG_ALGORITHM: &str = "philox4x64-10";' src/event_rng.rs
           grep -F 'philox4x64_10_matches_random123_mixed_known_answer_vector' src/event_rng.rs
           grep -F 'legacy_lcg_unchanged' benchmarks/event-rng/implementation-contract-v0.1.json
+          grep -F 'lineage_root_and_child_match_schema_v1_known_answer' src/event_lineage.rs
 
   exact-toolchain:
     runs-on: ubuntu-24.04
@@ -56,14 +62,18 @@ jobs:
           rustup run "$RUST_TOOLCHAIN" rustc -Vv
           rustup run "$RUST_TOOLCHAIN" cargo -Vv
           rustup run "$RUST_TOOLCHAIN" rustfmt --version
-      - name: Format the new module
+      - name: Format RNG and lineage modules
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
-        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs
+        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_lineage.rs
       - name: Run reference vectors and event-address adversarial tests
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
         run: cargo +"$RUST_TOOLCHAIN" test --locked --lib event_rng::tests
+      - name: Run hierarchical event-lineage tests
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" test --locked --lib event_lineage::tests
       - name: Compile the library surface
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
