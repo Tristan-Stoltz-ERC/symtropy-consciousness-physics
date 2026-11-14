@@ -42,3 +42,36 @@ Tests exercise order invariance, duplicate/missing keys, empty and non-finite sa
 3. Preregister metric-specific equivalence margins and comparison families.
 4. Export a new analysis artifact alongside, not over, the historical report.
 5. Independently reproduce the analysis from raw seed-keyed CSVs.
+
+
+## Existing-output analyzer
+
+The opt-in cooperation_paired_analysis example reads the existing
+cooperation_decomposition CSV and emits a separate JSON analysis receipt.
+It selects two condition labels and one metric, pairs by the explicit seed
+column, then reports paired summaries, a sign-flip result, and a deterministic
+percentile interval. It never changes or rewrites the simulation's historical
+CSV or terminal verdict.
+
+Example:
+
+    cargo run --locked --release --example cooperation_decomposition > run.csv
+    cargo run --locked --release --example cooperation_paired_analysis -- \
+      --input run.csv \
+      --control WELL+NO_REGEN \
+      --treatment WELL+REGEN \
+      --metric alive \
+      --bootstrap-replicates 20000 \
+      --bootstrap-seed 0x5041495245440001 \
+      --equivalence-margin 1.0 \
+      --margin-rationale "pre-registered domain-specific survival margin"
+
+The example-output CSV is deliberately parsed as unquoted comma-separated
+values, matching the current producer. It rejects quoted cells rather than
+silently misparsing an expanded CSV format. The equivalence option requires a
+rationale string, but the CLI cannot prove that rationale was preregistered;
+the investigator must preserve the actual preregistration record separately.
+
+The synthetic CI fixture checks schema, seed identity, paired mean, exact
+small-sample sign-flip path, and interval-containment status. It is a software
+contract test, not a scientific result.
