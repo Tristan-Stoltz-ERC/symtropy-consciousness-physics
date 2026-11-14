@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Layered throughput microbenchmark for the event-addressed Philox prototype.
@@ -12,9 +11,7 @@ use std::env;
 use std::hint::black_box;
 use std::time::Instant;
 
-use symtropy_consciousness_physics::event_rng::{
-    philox4x64_10, registry, EventAddress, SubjectId,
-};
+use symtropy_consciousness_physics::event_rng::{philox4x64_10, registry, EventAddress, SubjectId};
 
 const DEFAULT_ITERATIONS: usize = 100_000;
 const ROUNDS: usize = 5;
@@ -213,8 +210,12 @@ fn main() {
     println!("iterations_per_workload={iterations}");
     println!("rounds={ROUNDS}");
     println!("legacy_lcg_constants=multiplier:{LCG_MULTIPLIER};increment:{LCG_INCREMENT}");
-    println!("measurement_policy=rotated_workload_order;release_mode_recommended;no_performance_gate");
-    println!("workload,round,iterations,scalar_draws,elapsed_ns,draws_per_second,ns_per_draw,checksum");
+    println!(
+        "measurement_policy=rotated_workload_order;release_mode_recommended;no_performance_gate"
+    );
+    println!(
+        "workload,round,iterations,scalar_draws,elapsed_ns,draws_per_second,ns_per_draw,checksum"
+    );
 
     for round in 0..ROUNDS {
         for offset in 0..BenchmarkKind::ALL.len() {
@@ -243,8 +244,14 @@ fn main() {
             .copied()
             .filter(|sample| std::mem::discriminant(&sample.kind) == std::mem::discriminant(&kind))
             .collect();
-        let rates: Vec<_> = matching.iter().map(|sample| sample.draws_per_second()).collect();
-        let costs: Vec<_> = matching.iter().map(|sample| sample.nanoseconds_per_draw()).collect();
+        let rates: Vec<_> = matching
+            .iter()
+            .map(|sample| sample.draws_per_second())
+            .collect();
+        let costs: Vec<_> = matching
+            .iter()
+            .map(|sample| sample.nanoseconds_per_draw())
+            .collect();
         let checksums: Vec<_> = matching.iter().map(|sample| sample.checksum).collect();
         let checksum_stable = checksums.windows(2).all(|pair| pair[0] == pair[1]);
         println!(
