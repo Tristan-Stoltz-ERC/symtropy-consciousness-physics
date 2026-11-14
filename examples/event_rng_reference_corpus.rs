@@ -12,7 +12,7 @@ use std::fmt::Write as FmtWrite;
 use std::io::{self, Write};
 
 use symtropy_consciousness_physics::event_rng::{
-    philox4x64_10, registry, DrawPurpose, EventAddress, EventKind, SubjectId,
+    philox4x64_10, DrawPurpose, EventAddress, EventKind, SubjectId,
 };
 
 const CORPUS_SEED: u64 = 0x5241_4e44_4f4d_3132;
@@ -131,5 +131,4 @@ fn main() {
         "reference_corpus_status=EMITTED fixed=3 raw={} event_addressed={}",
         count, count
     );
-    let _ = registry::RANDOM_WALK;
 }
