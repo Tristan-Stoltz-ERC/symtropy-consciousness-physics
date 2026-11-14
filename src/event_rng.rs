@@ -57,11 +57,13 @@ pub mod registry {
     pub const INITIALIZATION: EventKind = EventKind(1);
     pub const RANDOM_WALK: EventKind = EventKind(2);
     pub const ENVIRONMENT: EventKind = EventKind(3);
+    pub const PHI_ABLATION_CONTROL: EventKind = EventKind(4);
 
     pub const INITIAL_POSITION_X: DrawPurpose = DrawPurpose(1);
     pub const INITIAL_POSITION_Y: DrawPurpose = DrawPurpose(2);
     pub const RANDOM_WALK_ANGLE: DrawPurpose = DrawPurpose(3);
     pub const ENVIRONMENTAL_NOISE: DrawPurpose = DrawPurpose(4);
+    pub const RANDOM_METRIC_SAMPLE: DrawPurpose = DrawPurpose(5);
 }
 
 /// Stable identity for a modeled event's subject.
