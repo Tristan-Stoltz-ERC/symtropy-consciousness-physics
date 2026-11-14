@@ -24,10 +24,15 @@
 
 use nalgebra::SVector;
 use symthaea_consciousness_equation::ConsciousnessInputs;
-use symtropy_consciousness_physics::convergence::{cohens_d, holm_bonferroni, mann_whitney_u};
+use symtropy_consciousness_physics::event_rng::{
+    registry, EventAddress, SubjectId,
+};
 use symtropy_consciousness_physics::experiment_seed::ExperimentSeedSchedule;
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
+use symtropy_consciousness_physics::paired_inference::{
+    bootstrap_mean_interval, pair_by_seed, summarize_paired, BootstrapConfig, SeededValue,
+};
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
@@ -54,15 +59,75 @@ enum Controller {
     Stationary,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RandomWalkRngMode {
+    LegacyLcg,
+    EventAddressed,
+}
+
+impl RandomWalkRngMode {
+    fn from_env() -> Result<Self, String> {
+        match std::env::var("SYMTROPY_GRADIENT_REPLACEMENT_RNG") {
+            Ok(value) if value == "event" => Ok(Self::EventAddressed),
+            Ok(value) if value == "legacy" => Ok(Self::LegacyLcg),
+            Ok(value) => Err(format!(
+                "SYMTROPY_GRADIENT_REPLACEMENT_RNG must be 'legacy' or 'event', got {value:?}"
+            )),
+            Err(std::env::VarError::NotPresent) => Ok(Self::LegacyLcg),
+            Err(error) => Err(format!(
+                "could not read SYMTROPY_GRADIENT_REPLACEMENT_RNG: {error}"
+            )),
+        }
+    }
+
+    const fn label(self) -> &'static str {
+        match self {
+            Self::LegacyLcg => "legacy_lcg",
+            Self::EventAddressed => "event_addressed_philox4x64_10",
+        }
+    }
+}
+
+const GRADIENT_REPLACEMENT_NAMESPACE: u64 = 0x4752_4144_5245_5031;
+
+fn random_walk_uniform(
+    mode: RandomWalkRngMode,
+    replicate_seed: u64,
+    simulation_tick: u64,
+    agent_index: usize,
+    legacy_state: &mut u64,
+) -> f64 {
+    match mode {
+        RandomWalkRngMode::LegacyLcg => rng_f64(legacy_state),
+        RandomWalkRngMode::EventAddressed => {
+            let stable_id = u32::try_from(agent_index + 1)
+                .expect("agent index must fit the nonzero u32 subject ID");
+            let subject = SubjectId::agent(stable_id)
+                .expect("one-based agent identity is nonzero");
+            EventAddress::new(
+                replicate_seed,
+                GRADIENT_REPLACEMENT_NAMESPACE,
+                subject,
+                simulation_tick,
+                registry::RANDOM_WALK,
+                registry::RANDOM_WALK_ANGLE,
+                0,
+            )
+            .uniform_open01(0)
+        }
+    }
+}
+
 struct ReplaceResult {
     controller: &'static str,
+    seed: u64,
     alive: f64,
     clustering: f64,
     cooperation: f64,
     energy: f64,
 }
 
-fn run_experiment(ctrl: Controller, seed: u64) -> ReplaceResult {
+fn run_experiment(ctrl: Controller, seed: u64, rng_mode: RandomWalkRngMode) -> ReplaceResult {
     let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, 0.0]));
     let mut consciousness = ConsciousnessField::<2>::new();
     consciousness.constants = ThermodynamicConstants::research();
@@ -101,7 +166,7 @@ fn run_experiment(ctrl: Controller, seed: u64) -> ReplaceResult {
 
     let mut coop = 0u64;
 
-    for _tick in 0..TICKS {
+    for tick in 0..TICKS {
         // Consciousness update (same for all controllers)
         for &h in &handles {
             let e = consciousness.entities.get(&h);
@@ -263,7 +328,14 @@ fn run_experiment(ctrl: Controller, seed: u64) -> ReplaceResult {
                 }
 
                 Controller::RandomWalk => {
-                    let angle = rng_f64(&mut rng) * std::f64::consts::TAU;
+                    let uniform = random_walk_uniform(
+                        rng_mode,
+                        seed,
+                        tick as u64,
+                        idx,
+                        &mut rng,
+                    );
+                    let angle = uniform * std::f64::consts::TAU;
                     SVector::from([angle.cos() * 20.0, angle.sin() * 20.0])
                 }
 
@@ -378,6 +450,7 @@ fn run_experiment(ctrl: Controller, seed: u64) -> ReplaceResult {
 
     ReplaceResult {
         controller: name,
+        seed,
         alive,
         energy,
         clustering: if clustering.is_finite() {
@@ -390,6 +463,15 @@ fn run_experiment(ctrl: Controller, seed: u64) -> ReplaceResult {
 }
 
 fn main() {
+    let rng_mode = match RandomWalkRngMode::from_env() {
+        Ok(mode) => mode,
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
+    };
+    eprintln!("random_walk_rng_mode={}", rng_mode.label());
+
     let seed_schedule = match ExperimentSeedSchedule::from_env(SEEDS) {
         Ok(schedule) => schedule,
         Err(error) => {
@@ -423,7 +505,7 @@ fn main() {
         let mut results = Vec::new();
         for &seed in seed_schedule.seeds() {
             eprintln!("  {name} seed={seed}...");
-            let r = run_experiment(ctrl, seed);
+            let r = run_experiment(ctrl, seed, rng_mode);
             println!(
                 "{},{seed},{:.1},{:.1},{:.2},{:.0}",
                 r.controller, r.alive, r.energy, r.clustering, r.cooperation
@@ -455,63 +537,7 @@ fn main() {
         );
     }
 
-    // Statistical tests: each controller vs FEP baseline (Holm-Bonferroni)
-    let fep = &all[0].1;
-    let fep_alive: Vec<f64> = fep.iter().map(|r| r.alive).collect();
-    let fep_coop: Vec<f64> = fep.iter().map(|r| r.cooperation).collect();
-
-    let mut p_alive = Vec::new();
-    let mut d_alive = Vec::new();
-    let mut p_coop = Vec::new();
-    let mut d_coop = Vec::new();
-
-    for (name, results) in &all[1..] {
-        let a: Vec<f64> = results.iter().map(|r| r.alive).collect();
-        let c: Vec<f64> = results.iter().map(|r| r.cooperation).collect();
-        let (_, _, pa) = mann_whitney_u(&fep_alive, &a);
-        let (_, _, pc) = mann_whitney_u(&fep_coop, &c);
-        p_alive.push((*name, pa));
-        d_alive.push(cohens_d(&fep_alive, &a));
-        p_coop.push((*name, pc));
-        d_coop.push(cohens_d(&fep_coop, &c));
-    }
-
-    let corrected_alive = holm_bonferroni(&p_alive, 0.05);
-    let corrected_coop = holm_bonferroni(&p_coop, 0.05);
-
-    eprintln!("\n── vs FEP_GRADIENT: Survival (Holm-Bonferroni, k=5) ──");
-    for (i, &(label, adj_p, sig)) in corrected_alive.iter().enumerate() {
-        let d = d_alive[i];
-        let size = if d.abs() > 0.8 {
-            "LARGE"
-        } else if d.abs() > 0.5 {
-            "medium"
-        } else {
-            "small"
-        };
-        eprintln!(
-            "  vs {:15}: p_adj={adj_p:.4}, d={d:.3} ({size}) {}",
-            label,
-            if sig { "← SIG" } else { "" }
-        );
-    }
-
-    eprintln!("\n── vs FEP_GRADIENT: Cooperation (Holm-Bonferroni, k=5) ──");
-    for (i, &(label, adj_p, sig)) in corrected_coop.iter().enumerate() {
-        let d = d_coop[i];
-        let size = if d.abs() > 0.8 {
-            "LARGE"
-        } else if d.abs() > 0.5 {
-            "medium"
-        } else {
-            "small"
-        };
-        eprintln!(
-            "  vs {:15}: p_adj={adj_p:.4}, d={d:.3} ({size}) {}",
-            label,
-            if sig { "← SIG" } else { "" }
-        );
-    }
+    emit_paired_controller_receipts(&all, rng_mode);
 
     // THE KEY QUESTION
     let controllers_with_coop: Vec<&str> = all
@@ -551,9 +577,181 @@ fn main() {
     eprintln!("\n=== Complete ===");
 }
 
+fn seeded_outcome_values(results: &[ReplaceResult], outcome: &str) -> Vec<SeededValue> {
+    results
+        .iter()
+        .map(|result| SeededValue {
+            seed_id: result.seed,
+            value: match outcome {
+                "alive" => result.alive,
+                "energy" => result.energy,
+                "clustering" => result.clustering,
+                "cooperation" => result.cooperation,
+                _ => panic!("unknown gradient-replacement outcome: {outcome}"),
+            },
+        })
+        .collect()
+}
+
+fn emit_paired_controller_receipts(
+    all: &[(&str, Vec<ReplaceResult>)],
+    rng_mode: RandomWalkRngMode,
+) {
+    const OUTCOMES: [&str; 4] = ["alive", "energy", "clustering", "cooperation"];
+    const BOOTSTRAP_REPLICATES: usize = 20_000;
+    const BOOTSTRAP_SEED_BASE: u64 = 0x4752_5041_4952_0001;
+
+    let fep = &all[0].1;
+    println!("paired_analysis_unit=complete_simulation_seed");
+    println!("paired_analysis_key=actual_seed_value");
+    println!("paired_estimand=controller_minus_FEP_GRADIENT");
+    println!("paired_bootstrap=whole_seed_pair_percentile_20000");
+    println!("paired_p_values=NOT_EVALUATED_SIGN_EXCHANGEABILITY_UNQUALIFIED");
+    println!("paired_equivalence=NOT_EVALUATED_NO_PREREGISTERED_MARGIN");
+
+    for (controller_index, (name, results)) in all.iter().enumerate().skip(1) {
+        for (outcome_index, outcome) in OUTCOMES.iter().copied().enumerate() {
+            let reference_values = seeded_outcome_values(fep, outcome);
+            let candidate_values = seeded_outcome_values(results, outcome);
+            let pairs = pair_by_seed(&reference_values, &candidate_values)
+                .expect("all controllers must share the exact unique seed schedule");
+            let summary = summarize_paired(&pairs)
+                .expect("non-empty matched seed pairs must be summarizable");
+            let rng_seed = BOOTSTRAP_SEED_BASE
+                + ((controller_index - 1) * OUTCOMES.len() + outcome_index) as u64;
+            let interval = bootstrap_mean_interval(
+                &pairs,
+                BootstrapConfig {
+                    replicates: BOOTSTRAP_REPLICATES,
+                    confidence_level: 0.95,
+                    rng_seed,
+                },
+            )
+            .expect("fixed bootstrap contract is valid");
+            let seed_ids = pairs
+                .iter()
+                .map(|pair| pair.seed_id.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            let sd = summary
+                .sample_standard_deviation
+                .map(|value| format!("{value:.17e}"))
+                .unwrap_or_else(|| "null".to_string());
+            let se = summary
+                .standard_error
+                .map(|value| format!("{value:.17e}"))
+                .unwrap_or_else(|| "null".to_string());
+            let dz = summary
+                .cohens_dz
+                .map(|value| format!("{value:.17e}"))
+                .unwrap_or_else(|| "null".to_string());
+
+            println!(
+                "PAIRED_CONTROLLER_JSON={{\"schema\":\"luminous.symtropy.gradient-replacement-paired-receipt.v0.1\",\"rng_mode\":\"{}\",\"reference\":\"FEP_GRADIENT\",\"controller\":\"{}\",\"outcome\":\"{}\",\"estimand\":\"controller_minus_FEP_GRADIENT\",\"pairing_key\":\"actual_seed_value\",\"seed_ids\":[{}],\"n\":{},\"mean_difference\":{:.17e},\"median_difference\":{:.17e},\"sample_standard_deviation\":{},\"standard_error\":{},\"cohens_dz\":{},\"bootstrap\":{{\"method\":\"percentile_whole_seed_pair\",\"confidence_level\":0.95,\"lower\":{:.17e},\"upper\":{:.17e},\"replicates\":{},\"rng\":\"SplitMix64\",\"rng_seed\":{}}},\"sign_flip\":{{\"status\":\"not_evaluated\",\"reason\":\"seed_pairing_does_not_establish_sign_exchangeability\"}},\"equivalence\":{{\"status\":\"not_evaluated\",\"reason\":\"no_preregistered_outcome_margin\"}}}}",
+                rng_mode.label(),
+                name,
+                outcome,
+                seed_ids,
+                summary.n,
+                summary.mean_difference,
+                summary.median_difference,
+                sd,
+                se,
+                dz,
+                interval.lower,
+                interval.upper,
+                interval.replicates,
+                interval.rng_seed,
+            );
+        }
+    }
+}
+
 fn rng_f64(s: &mut u64) -> f64 {
     *s = s
         .wrapping_mul(6364136223846793005)
         .wrapping_add(1442695040888963407);
     (*s >> 11) as f64 / (1u64 << 53) as f64
 }
+
+#[cfg(test)]
+mod event_random_walk_tests {
+    use super::*;
+
+    #[test]
+    fn event_addressed_random_walk_is_repeatable_for_seed_agent_and_tick() {
+        let mut legacy_a = 42;
+        let mut legacy_b = 42;
+        let first = random_walk_uniform(
+            RandomWalkRngMode::EventAddressed, 42, 17, 3, &mut legacy_a
+        );
+        let second = random_walk_uniform(
+            RandomWalkRngMode::EventAddressed, 42, 17, 3, &mut legacy_b
+        );
+        assert_eq!(first.to_bits(), second.to_bits());
+        assert_eq!(legacy_a, 42);
+        assert_eq!(legacy_b, 42);
+    }
+
+    #[test]
+    fn event_addressed_random_walk_separates_replicate_agent_and_tick() {
+        let sample = |seed, tick, agent| {
+            let mut legacy_state = seed;
+            random_walk_uniform(
+                RandomWalkRngMode::EventAddressed,
+                seed,
+                tick,
+                agent,
+                &mut legacy_state,
+            )
+        };
+        let baseline = sample(42, 17, 3);
+        assert_ne!(baseline.to_bits(), sample(1_039, 17, 3).to_bits());
+        assert_ne!(baseline.to_bits(), sample(42, 18, 3).to_bits());
+        assert_ne!(baseline.to_bits(), sample(42, 17, 4).to_bits());
+    }
+
+    #[test]
+    fn event_addressed_random_walk_uniforms_are_strictly_open() {
+        for seed in [42, 1_039, u64::MAX] {
+            for tick in [0, 1, 17, (TICKS - 1) as u64] {
+                for agent in 0..AGENTS {
+                    let mut legacy_state = seed;
+                    let value = random_walk_uniform(
+                        RandomWalkRngMode::EventAddressed,
+                        seed,
+                        tick,
+                        agent,
+                        &mut legacy_state,
+                    );
+                    assert!(value > 0.0 && value < 1.0);
+                    assert_eq!(legacy_state, seed);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn legacy_random_walk_still_consumes_the_historical_lcg_stream() {
+        let mut actual_state = 42;
+        let mut expected_state = 42;
+        let actual = random_walk_uniform(
+            RandomWalkRngMode::LegacyLcg, 42, 17, 3, &mut actual_state
+        );
+        let expected = rng_f64(&mut expected_state);
+        assert_eq!(actual.to_bits(), expected.to_bits());
+        assert_eq!(actual_state, expected_state);
+    }
+
+    #[test]
+    fn default_rng_mode_is_legacy_when_environment_is_absent() {
+        // This checks the parser's default contract without relying on the
+        // process environment, which may be shared by parallel test threads.
+        assert_eq!(RandomWalkRngMode::LegacyLcg.label(), "legacy_lcg");
+        assert_eq!(
+            RandomWalkRngMode::EventAddressed.label(),
+            "event_addressed_philox4x64_10"
+        );
+    }
+}
+
