@@ -1,0 +1,42 @@
+{
+  "schema": "luminous.symtropy.event-rng-stat-stream.v0.1",
+  "status": "deterministic_stream_export_and_repeatability_smoke",
+  "modes": ["raw_philox_counter_stream", "event_addressed_philox_stream"],
+  "words_per_block": 4,
+  "word_type": "u64",
+  "serialization": "little_endian",
+  "stdout": "raw_binary_only",
+  "stderr": "metadata_and_diagnostics",
+  "byte_count": "blocks * 4 * 8",
+  "event_address_schedule": [
+    "replicate_seed",
+    "experiment_namespace",
+    "stable_nonzero_agent_subject_id",
+    "simulation_tick",
+    "event_kind",
+    "draw_purpose",
+    "occurrence_ordinal"
+  ],
+  "repeatability_controls": [
+    "exact_toolchain_asserted",
+    "locked_dependency_graph",
+    "offline_release_execution_after_fetch",
+    "exact_expected_byte_count",
+    "two_independent_generations_byte_identical",
+    "raw_vs_event_addressed_streams_not_identical",
+    "sha256_reported"
+  ],
+  "future_statistical_batteries": [
+    "TestU01_SmallCrush",
+    "TestU01_Crush",
+    "TestU01_BigCrush",
+    "PractRand_staged_volumes",
+    "top52_open_uniform_transform"
+  ],
+  "nonclaims": [
+    "not_a_TestU01_or_PractRand_pass",
+    "not_a_proof_of_randomness",
+    "not_a_causal_validity_result",
+    "not_a_semantic_identity_validation"
+  ]
+}
