@@ -22,6 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           jq -e '.schema == "luminous.cargo-artifact-passport.v0.1"' benchmarks/rust-toolchain/cargo-artifact-passport-v0.1.json
+          jq -e '.schema == "luminous.rust-toolchain-benchmark-program.v0.1"' benchmarks/rust-toolchain/benchmark-program-v0.1.json
           bash -n scripts/capture-cargo-artifacts.sh
           bash -n scripts/verify-cargo-artifact-passport.sh
           bash -n scripts/test-cargo-artifact-passport.sh
