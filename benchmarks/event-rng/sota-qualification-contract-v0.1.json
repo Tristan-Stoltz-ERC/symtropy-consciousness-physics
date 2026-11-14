@@ -1,0 +1,55 @@
+{
+  "schema": "luminous.symtropy.event-keyed-rng-sota-qualification.v0.1",
+  "status": "proposed_qualification_programme",
+  "generator_baselines": [
+    "Random123_Philox4x64-10_reference",
+    "Random123_Threefry4x64_reference",
+    "historical_Symtropy_LCG_where_comparable"
+  ],
+  "statistical_batteries": [
+    "TestU01_SmallCrush",
+    "TestU01_Crush",
+    "TestU01_BigCrush",
+    "PractRand_staged_stream_tests"
+  ],
+  "test_streams": [
+    "raw_philox_u64_words",
+    "event_addressed_schedule_families",
+    "top52_open_interval_uniform_conversion"
+  ],
+  "benchmark_layers": [
+    "generator_core",
+    "event_address_mapping",
+    "end_to_end_application"
+  ],
+  "platform_qualification": [
+    "x86_64",
+    "aarch64",
+    "Rust_reference_C_parity",
+    "GPU_only_if_implemented",
+    "thread_order_invariance"
+  ],
+  "performance_targets": {
+    "address_mapping_overhead_max_initial_target": 0.10,
+    "same_host_paired_comparison_required": true,
+    "core_and_mapping_costs_separate": true
+  },
+  "causal_reports": [
+    "matched_event_coverage",
+    "reference_only_events",
+    "counterfactual_only_events",
+    "conditional_events_by_family",
+    "semantic_aliases",
+    "duplicate_event_keys",
+    "paired_vs_independent_estimator_variance"
+  ],
+  "nonclaims": [
+    "no_TestU01_or_PractRand_pass_claim",
+    "no_better_than_Random123_quality_claim",
+    "no_throughput_claim",
+    "no_cross_platform_claim",
+    "no_GPU_support_claim",
+    "not_cryptographically_secure",
+    "not_a_proof_of_causal_validity"
+  ]
+}

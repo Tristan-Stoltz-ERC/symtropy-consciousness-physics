@@ -32,3 +32,9 @@ required-features = ["consciousness-curvature"]
 name = "curvature_lensing"
 path = "examples/curvature_lensing.rs"
 required-features = ["consciousness-curvature"]
+
+
+# Analytical counterfactual variance benchmark for the event-keyed RNG.
+[[example]]
+name = "event_rng_crn_variance"
+path = "examples/event_rng_crn_variance.rs"

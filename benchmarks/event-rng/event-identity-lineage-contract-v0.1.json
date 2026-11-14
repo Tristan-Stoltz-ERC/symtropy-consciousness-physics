@@ -1,0 +1,52 @@
+{
+  "schema": "luminous.symtropy.event-identity-lineage-policy.v0.1",
+  "status": "proposed_model_integration_contract",
+  "identity_layers": [
+    "experiment_namespace",
+    "replicate_seed",
+    "stable_subject_id",
+    "simulation_tick",
+    "event_kind",
+    "draw_purpose",
+    "semantic_occurrence_ordinal"
+  ],
+  "sharing_policies": ["must_share", "conditional", "distinct"],
+  "dynamic_entity_birth_key": [
+    "world_namespace",
+    "canonical_parent_ids",
+    "birth_event_key",
+    "offspring_slot"
+  ],
+  "prohibited_identity_inputs": [
+    "controller_name",
+    "treatment_label",
+    "thread_id",
+    "wall_clock",
+    "execution_order",
+    "branch_traversal_path",
+    "runtime_vector_position"
+  ],
+  "failure_modes": [
+    "semantic_alias",
+    "split_identity",
+    "order_leakage",
+    "generation_reuse",
+    "ordinal_drift",
+    "namespace_leakage",
+    "false_completeness"
+  ],
+  "acceptance_targets": {
+    "alias_collisions": 0,
+    "duplicate_event_draw_keys": 0,
+    "shared_event_bit_identity": 1.0,
+    "conditional_event_coverage_reported": 1.0,
+    "dynamic_entity_classes_with_reviewed_lineage": 1.0,
+    "unknown_identity_policy": "block_qualification"
+  },
+  "not_implemented": [
+    "dynamic_genealogical_subject_ids",
+    "semantic_alias_audit",
+    "model_owned_sharing_registry",
+    "real_symtropy_call_site_integration"
+  ]
+}
