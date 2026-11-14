@@ -48,3 +48,8 @@ path = "examples/event_rng_throughput.rs"
 [[example]]
 name = "event_rng_reference_corpus"
 path = "examples/event_rng_reference_corpus.rs"
+
+# Fixed cross-architecture Philox and semantic-lineage portability corpus.
+[[example]]
+name = "event_rng_portability_vectors"
+path = "examples/event_rng_portability_vectors.rs"
