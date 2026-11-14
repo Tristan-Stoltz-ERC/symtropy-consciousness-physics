@@ -164,3 +164,10 @@ No receipt should include a treatment label in the event key itself.
 - Shared randomness does not guarantee lower variance for every estimand.
 - The current LCG, seed schedule, experiment CSVs, and published conclusions remain unchanged.
 - Adoption requires a separate implementation PR, independent review of event semantics, reference-vector tests, statistical qualification, and matched performance results.
+
+## Related work
+
+- Buffalo, Pearson and Klein, *Realizing Common Random Numbers: Event-Keyed Hashing for Causally Valid Stochastic Models* (2026), arXiv:2603.11084: https://arxiv.org/abs/2603.11084
+- Salmon, Moraes, Dror and Shaw, *Parallel Random Numbers: As Easy as 1, 2, 3* (2011), which introduced Random123 counter-based generators: https://www.thesalmons.org/john/random123/papers/random123sc11.pdf
+
+The first reference motivates execution-invariant event addressing for counterfactual comparisons. The second is the underlying counter-based RNG family reference; it does not establish the simulator's event-identity assumptions or scientific validity.
