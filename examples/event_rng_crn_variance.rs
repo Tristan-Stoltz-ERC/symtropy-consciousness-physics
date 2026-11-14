@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! A controlled common-random-numbers (CRN) variance experiment.
@@ -12,9 +11,7 @@
 
 use std::process;
 
-use symtropy_consciousness_physics::event_rng::{
-    registry, EventAddress, SubjectId,
-};
+use symtropy_consciousness_physics::event_rng::{registry, EventAddress, SubjectId};
 
 const SUBJECTS_PER_REPLICATE: u32 = 2_048;
 const INDEPENDENT_REPLICATES: usize = 512;
@@ -46,8 +43,7 @@ struct CaseResult {
 }
 
 fn event_uniform(replicate_seed: u64, namespace: u64, subject_index: u32) -> f64 {
-    let subject = SubjectId::agent(subject_index + 1)
-        .expect("benchmark subject IDs are nonzero");
+    let subject = SubjectId::agent(subject_index + 1).expect("benchmark subject IDs are nonzero");
     let address = EventAddress::new(
         replicate_seed,
         namespace,
@@ -69,7 +65,10 @@ fn treatment_outcome(exogenous: f64, beta: f64) -> f64 {
 }
 
 fn sample_variance(values: &[f64]) -> f64 {
-    assert!(values.len() >= 2, "sample variance requires at least two values");
+    assert!(
+        values.len() >= 2,
+        "sample variance requires at least two values"
+    );
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     values
         .iter()
@@ -101,21 +100,16 @@ fn exact_variance_ratio(beta: f64) -> f64 {
     let variance_control = second_control - mean_control * mean_control;
 
     let mean_treatment_without_intercept = mean_u2 + beta * mean_u;
-    let second_treatment_without_intercept =
-        mean_u4 + 2.0 * beta * mean_u3 + beta * beta * mean_u2;
-    let variance_treatment =
-        second_treatment_without_intercept
-            - mean_treatment_without_intercept * mean_treatment_without_intercept;
+    let second_treatment_without_intercept = mean_u4 + 2.0 * beta * mean_u3 + beta * beta * mean_u2;
+    let variance_treatment = second_treatment_without_intercept
+        - mean_treatment_without_intercept * mean_treatment_without_intercept;
 
     let matched = beta * beta * variance_u;
     let independent = variance_control + variance_treatment;
     matched / independent
 }
 
-fn bootstrap_variance_ratio(
-    trials: &[TrialEstimate],
-    initial_state: u64,
-) -> (f64, f64) {
+fn bootstrap_variance_ratio(trials: &[TrialEstimate], initial_state: u64) -> (f64, f64) {
     let mut rng = SplitMix64::new(initial_state);
     let mut ratios = Vec::with_capacity(BOOTSTRAP_DRAWS);
 
@@ -134,10 +128,7 @@ fn bootstrap_variance_ratio(
     }
 
     ratios.sort_by(f64::total_cmp);
-    (
-        percentile(&ratios, 0.025),
-        percentile(&ratios, 0.975),
-    )
+    (percentile(&ratios, 0.025), percentile(&ratios, 0.975))
 }
 
 fn percentile(sorted: &[f64], probability: f64) -> f64 {
@@ -163,16 +154,8 @@ fn run_case(beta: f64, bootstrap_seed: u64) -> CaseResult {
 
         for subject in 0..SUBJECTS_PER_REPLICATE {
             // Same complete event address in the two matched scenarios.
-            let common_control = event_uniform(
-                replicate_seed,
-                COMMON_NAMESPACE,
-                subject,
-            );
-            let common_treatment = event_uniform(
-                replicate_seed,
-                COMMON_NAMESPACE,
-                subject,
-            );
+            let common_control = event_uniform(replicate_seed, COMMON_NAMESPACE, subject);
+            let common_treatment = event_uniform(replicate_seed, COMMON_NAMESPACE, subject);
             assert_eq!(
                 common_control.to_bits(),
                 common_treatment.to_bits(),
@@ -180,22 +163,14 @@ fn run_case(beta: f64, bootstrap_seed: u64) -> CaseResult {
             );
 
             // Independent control/treatment draws use a distinct namespace.
-            let independent_control = event_uniform(
-                replicate_seed,
-                COMMON_NAMESPACE,
-                subject,
-            );
-            let independent_treatment = event_uniform(
-                replicate_seed,
-                INDEPENDENT_NAMESPACE,
-                subject,
-            );
+            let independent_control = event_uniform(replicate_seed, COMMON_NAMESPACE, subject);
+            let independent_treatment =
+                event_uniform(replicate_seed, INDEPENDENT_NAMESPACE, subject);
 
             matched_sum +=
                 treatment_outcome(common_treatment, beta) - control_outcome(common_control);
-            independent_sum +=
-                treatment_outcome(independent_treatment, beta)
-                    - control_outcome(independent_control);
+            independent_sum += treatment_outcome(independent_treatment, beta)
+                - control_outcome(independent_control);
         }
 
         trials.push(TrialEstimate {
@@ -205,16 +180,12 @@ fn run_case(beta: f64, bootstrap_seed: u64) -> CaseResult {
     }
 
     let matched: Vec<f64> = trials.iter().map(|trial| trial.matched_crn).collect();
-    let independent: Vec<f64> = trials
-        .iter()
-        .map(|trial| trial.independent_draws)
-        .collect();
+    let independent: Vec<f64> = trials.iter().map(|trial| trial.independent_draws).collect();
     let matched_variance = sample_variance(&matched);
     let independent_variance = sample_variance(&independent);
     let empirical_variance_ratio = matched_variance / independent_variance;
     let known_effect = TREATMENT_INTERCEPT + beta / 2.0;
-    let (bootstrap_low, bootstrap_high) =
-        bootstrap_variance_ratio(&trials, bootstrap_seed);
+    let (bootstrap_low, bootstrap_high) = bootstrap_variance_ratio(&trials, bootstrap_seed);
 
     CaseResult {
         beta,
@@ -252,8 +223,14 @@ fn print_case(label: &str, result: CaseResult) {
     println!("{label}_beta={:.6}", result.beta);
     println!("{label}_known_effect={:.6}", result.known_effect);
     println!("{label}_matched_effect_mean={:.9}", result.matched_mean);
-    println!("{label}_independent_effect_mean={:.9}", result.independent_mean);
-    println!("{label}_matched_estimator_variance={:.12e}", result.matched_variance);
+    println!(
+        "{label}_independent_effect_mean={:.9}",
+        result.independent_mean
+    );
+    println!(
+        "{label}_matched_estimator_variance={:.12e}",
+        result.matched_variance
+    );
     println!(
         "{label}_independent_estimator_variance={:.12e}",
         result.independent_variance
@@ -276,12 +253,10 @@ fn main() {
     let positive = run_case(0.5, 0x504f_5349_5449_5645);
     let negative = run_case(-1.5, 0x4e45_4741_5449_5645);
 
-    let positive_mean_ok =
-        (positive.matched_mean - positive.known_effect).abs() < 0.01
-            && (positive.independent_mean - positive.known_effect).abs() < 0.01;
-    let negative_mean_ok =
-        (negative.matched_mean - negative.known_effect).abs() < 0.01
-            && (negative.independent_mean - negative.known_effect).abs() < 0.01;
+    let positive_mean_ok = (positive.matched_mean - positive.known_effect).abs() < 0.01
+        && (positive.independent_mean - positive.known_effect).abs() < 0.01;
+    let negative_mean_ok = (negative.matched_mean - negative.known_effect).abs() < 0.01
+        && (negative.independent_mean - negative.known_effect).abs() < 0.01;
 
     // Positive covariance should help; negative covariance is an explicit
     // counterexample to the claim that common random numbers always help.
@@ -298,11 +273,7 @@ fn main() {
     println!("positive_covariance_crn_variance_reduction_gate={positive_crn_helps}");
     println!("negative_covariance_crn_inflation_control={negative_crn_can_hurt}");
 
-    if positive_mean_ok
-        && negative_mean_ok
-        && positive_crn_helps
-        && negative_crn_can_hurt
-    {
+    if positive_mean_ok && negative_mean_ok && positive_crn_helps && negative_crn_can_hurt {
         println!("benchmark_status=PASS");
     } else {
         eprintln!("benchmark_status=FAIL");
