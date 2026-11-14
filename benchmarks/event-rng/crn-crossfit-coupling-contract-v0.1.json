@@ -1,0 +1,56 @@
+{
+  "schema": "luminous.symtropy.crn-crossfit-coupling.v0.1",
+  "status": "disjoint_seed_cross_fitted_coupling_policy_benchmark",
+  "model": {
+    "exogenous": "U ~ Uniform(0,1) via EventAddress",
+    "control": "Y0 = U^2",
+    "treatment": "Y1 = U^2 + 0.25 + beta*U",
+    "known_ate": "0.25 + beta/2",
+    "covariance": "4/45 + beta/12"
+  },
+  "selection": {
+    "training_estimator": "sample_covariance_of_potential_outcomes_under_shared_event_address",
+    "policy_rule": "SHARED_if_training_covariance_positive_else_INDEPENDENT",
+    "holdout_used_for_selection": false,
+    "policy_frozen_before_holdout": true
+  },
+  "split": {
+    "training_replicate_indices": "[0,256)",
+    "holdout_replicate_indices": "[256,512)",
+    "training_replicates": 256,
+    "holdout_replicates": 256,
+    "subjects_per_replicate": 2048,
+    "replicate_seed_schedule": "fixed_base_plus_logical_index_times_stride"
+  },
+  "preregistered_cases": [
+    {"beta":0.5,"known_ate":0.5,"covariance_sign":"positive","expected_policy":"SHARED"},
+    {"beta":-1.0,"known_ate":-0.25,"covariance_sign":"weak_positive","expected_policy":"SHARED"},
+    {"beta":-1.5,"known_ate":-0.5,"covariance_sign":"negative","expected_policy":"INDEPENDENT"}
+  ],
+  "evaluation": {
+    "estimators": ["SHARED_CRN","INDEPENDENT_DRAWS","TRAIN_SELECTED_POLICY"],
+    "independent_unit": "outer_replicate",
+    "bootstrap": {
+      "method":"percentile",
+      "unit":"paired_outer_replicate",
+      "replicates":2000,
+      "confidence_level":0.95,
+      "rng":"SplitMix64_with_rejection_sampling"
+    }
+  },
+  "gates": [
+    "training_covariance_sign_selects_preregistered_policy",
+    "shared_and_independent_holdout_mean_recover_known_ate_with_error_below_0.01",
+    "selected_policy_to_independent_variance_ratio_below_1.10",
+    "negative_covariance_shared_crn_ratio_above_1.20",
+    "negative_covariance_selector_chooses_independent"
+  ],
+  "nonclaims": [
+    "not_a_real_symtropy_experiment",
+    "not_a_universal_crn_policy",
+    "no_TestU01_or_PractRand_pass",
+    "no_physical_or_social_causal_validity_claim",
+    "no_production_adaptive_coupling_claim",
+    "no_SOTA_performance_claim"
+  ]
+}
