@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Emits a deterministic Philox corpus for comparison with Random123's C++ API.
@@ -36,11 +35,7 @@ impl SplitMix64 {
     }
 }
 
-fn emit_row(
-    output: &mut String,
-    counter: [u64; 4],
-    key: [u64; 2],
-) -> Result<(), std::fmt::Error> {
+fn emit_row(output: &mut String, counter: [u64; 4], key: [u64; 2]) -> Result<(), std::fmt::Error> {
     let result = philox4x64_10(counter, key);
     writeln!(
         output,
@@ -65,7 +60,10 @@ fn parse_count() -> usize {
         .transpose()
         .expect("corpus count must be a positive integer")
         .unwrap_or(4096);
-    assert!((1..=1_000_000).contains(&count), "corpus count must be in 1..=1_000_000");
+    assert!(
+        (1..=1_000_000).contains(&count),
+        "corpus count must be in 1..=1_000_000"
+    );
     count
 }
 
