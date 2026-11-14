@@ -1,0 +1,29 @@
+# Cargo artifact passport v0.1
+
+The passport extends Cargo's JSON artifact capture into a content-addressed evidence receipt.
+
+## Capture boundary
+
+The builder verifies the exact requested rustc and Cargo versions, warms the locked dependency graph with `cargo fetch --locked`, then runs `cargo build --locked --all-targets --offline` with a fresh dedicated target directory and Cargo 1.100's separate build directory configured through `CARGO_BUILD_BUILD_DIR`. Rustc wrappers are explicitly disabled for this capture lane.
+
+Only Cargo `compiler-artifact` JSON messages are used to discover compiler artifacts. Cargo may report a file under either the target directory or the separate build directory (for example, a build-script output); such a file is recorded only because Cargo explicitly named it. The implementation never scans, enumerates, or guesses the private build-directory layout. Every reported filename is resolved and required to remain under one of the two isolated Cargo output roots.
+
+## Identity recorded
+
+- Exact rustc verbose version, commit hash, exact Cargo version and host target triple.
+- Source Git commit and tree.
+- The manifest path and digest and the nearest applicable Cargo.lock path and digest.
+- Cargo metadata, Cargo JSON messages, diagnostics, and compiler artifact manifest digests.
+- Workspace and Cargo-home config digests when those config files exist.
+- Effective rustflags and encoded rustflags, including the Cargo-specific rustflags setting.
+- Explicitly disabled rustc and workspace rustc wrappers for this direct-compiler capture lane.
+- A fresh output directory, a fresh target directory, and a separate intermediate build directory.
+- For each reported compiler artifact: package ID, target, profile, fresh flag, executable flag, relative file path, SHA-256 and byte size.
+
+## Verification
+
+The verifier checks the passport digest, evidence input digests, compiler-artifact record count, and every artifact's content hash and size. When supplied with a repository root, it also compares the current Git commit/tree, manifest and applicable lockfile to the passport.
+
+## Limits
+
+The passport proves integrity of the captured record and currently inspected final artifact files. It does not prove independent reproducibility, cache-reuse safety, builder identity, artifact signatures, or integrity of private intermediate compiler files. Reproducibility requires a second independent build and normalized digest comparison.

@@ -1,0 +1,46 @@
+{
+  "schema": "luminous.rust-toolchain-benchmark-program.v0.1",
+  "status": "proposed_research_contract",
+  "comparators": {
+    "compiler_wide": "pinned_upstream_rustc_perf_revision",
+    "application_builds": "same_git_source_manifest_and_Cargo_lock",
+    "runtime": "same_workload_inputs_and_binary_identity_receipts"
+  },
+  "separate_conditions": [
+    "fresh_target_and_build_dir",
+    "no_op_reused_target_and_build_dir",
+    "incremental_predefined_source_edit",
+    "dependency_resolution_cold_and_warm_separately",
+    "sccache_disabled",
+    "sccache_enabled_with_separate_cache_namespace"
+  ],
+  "sample_design": {
+    "exploratory_paired_build_trials_min": 5,
+    "confirmatory_paired_build_trials_min": 30,
+    "rotate_toolchain_order": true,
+    "runtime_p99_observations_per_condition_min": 10000,
+    "runtime_nested_in_build_trials": "hierarchical_or_block_bootstrap_required",
+    "all_failures_and_exclusions_retained": true
+  },
+  "statistics": {
+    "paired_estimand": "log_baseline_time_over_candidate_time",
+    "summaries": ["median", "MAD", "paired_bootstrap_interval"],
+    "multiplicity": "Holm_for_preregistered_comparison_family",
+    "performance_improvement_target": "at_least_5_percent_median_with_uncertainty_support",
+    "critical_regression_review_threshold": "at_least_5_percent_median"
+  },
+  "correctness_gates": [
+    "no_unexpected_tests_abi_or_serialization_regressions",
+    "no_unapproved_Cargo_lock_changes",
+    "deterministic_outputs_preserved_where_expected",
+    "artifact_hashes_and_sizes_recorded",
+    "cache_tamper_negative_controls_reject"
+  ],
+  "luminous_suites": ["Symtropy", "Symthaea", "Prism", "Mycelix", "NixOS_Nixward"],
+  "nonclaims": [
+    "performance_targets_are_not_results",
+    "no_SOTA_claim_from_application_specific_benchmarks",
+    "no_reproducible_build_claim_without_independent_build_comparison",
+    "no_safe_cache_reuse_claim_from_artifact_passport_alone"
+  ]
+}
