@@ -1,0 +1,72 @@
+name: Event-keyed RNG qualification
+
+on:
+  pull_request:
+    paths:
+      - "src/event_rng.rs"
+      - "src/lib.rs"
+      - "docs/research/EVENT_KEYED_RNG_IMPLEMENTATION_V0_1.md"
+      - "benchmarks/event-rng/implementation-contract-v0.1.json"
+      - ".github/workflows/event-keyed-rng-qualification.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: event-keyed-rng-\${{ github.workflow }}-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Validate the machine-readable contract
+        run: |
+          set -euo pipefail
+          jq -e '.schema == "luminous.symtropy.event-keyed-rng-implementation.v0.1"' \
+            benchmarks/event-rng/implementation-contract-v0.1.json
+          grep -F 'pub const EVENT_KEY_SCHEMA_VERSION: u32 = 1;' src/event_rng.rs
+          grep -F 'pub const EVENT_RNG_ALGORITHM: &str = "philox4x64-10";' src/event_rng.rs
+          grep -F 'philox4x64_10_matches_random123_mixed_known_answer_vector' src/event_rng.rs
+          grep -F 'legacy_lcg_unchanged' benchmarks/event-rng/implementation-contract-v0.1.json
+
+  exact-toolchain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ["1.99.1", "1.100.0", "1.101.0-beta.1"]
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact compiler and Cargo
+        shell: bash
+        env:
+          RUST_TOOLCHAIN: \${{ matrix.toolchain }}
+        run: |
+          set -euo pipefail
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt
+          rustup run "$RUST_TOOLCHAIN" rustc -Vv
+          rustup run "$RUST_TOOLCHAIN" cargo -Vv
+          rustup run "$RUST_TOOLCHAIN" rustfmt --version
+      - name: Format the new module
+        env:
+          RUST_TOOLCHAIN: \${{ matrix.toolchain }}
+        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs
+      - name: Run reference vectors and event-address adversarial tests
+        env:
+          RUST_TOOLCHAIN: \${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" test --locked --lib event_rng::tests
+      - name: Compile the library surface
+        env:
+          RUST_TOOLCHAIN: \${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" check --locked --lib
+      - name: Preserve dependency graph
+        run: git diff --exit-code -- Cargo.lock
