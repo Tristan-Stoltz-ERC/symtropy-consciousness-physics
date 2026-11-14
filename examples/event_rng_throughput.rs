@@ -31,7 +31,7 @@ enum BenchmarkKind {
 }
 
 impl BenchmarkKind {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::LegacyLcg53,
         Self::PhiloxCoreBlock,
         Self::EventConstructWord,
