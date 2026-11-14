@@ -1,0 +1,49 @@
+{
+  "schema": "luminous.symtropy.paired-ablation-receipt.v0.1",
+  "status": "exploratory_seed_paired_effects_and_bootstrap",
+  "independent_unit": "complete_simulation_seed_replicate",
+  "pairing_key": "actual_seed_value",
+  "estimand": "treatment_minus_control",
+  "seed_schedule": "42 + 997 * logical_seed_index",
+  "replicates": 30,
+  "contrasts": [
+    {"control":"RANDOM_LEGACY","treatment":"RANDOM_EVENT","priority":"primary"},
+    {"control":"CONST_0.5","treatment":"RANDOM_EVENT","priority":"secondary"},
+    {"control":"CONST_0.5","treatment":"ENTROPY_PROXY","priority":"secondary"}
+  ],
+  "outcomes": ["clustering","alive","energy"],
+  "reported_effects": [
+    "mean_paired_difference",
+    "median_paired_difference",
+    "sample_standard_deviation",
+    "standard_error",
+    "paired_cohens_dz"
+  ],
+  "bootstrap": {
+    "method":"percentile",
+    "resampling_unit":"whole_seed_pair",
+    "replicates":20000,
+    "confidence_level":0.95,
+    "rng":"SplitMix64_non_cryptographic",
+    "seed":"fixed_unique_per_contrast_and_outcome"
+  },
+  "sign_flip": {
+    "status":"not_evaluated",
+    "reason":"matching_seed_ids_does_not_establish_sign_exchangeability_or_randomized_pair_assignment"
+  },
+  "equivalence": {
+    "status":"not_evaluated",
+    "reason":"no_preregistered_metric_specific_margin"
+  },
+  "multiplicity": {
+    "p_values_emitted":false,
+    "reason":"no_hypothesis_test_family_claimed"
+  },
+  "nonclaims": [
+    "not_a_confirmatory_hypothesis_test",
+    "not_a_physical_or_social_causal_validity_result",
+    "no_equation_level_phi_measurement",
+    "no_TestU01_or_PractRand_pass",
+    "agents_and_ticks_are_not_independent_replicates"
+  ]
+}
