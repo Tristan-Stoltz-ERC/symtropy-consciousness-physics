@@ -152,11 +152,14 @@ run_seed_set() {
   local variant="$1" binary="$2" indices="$3" phase="$4" trial="$5" repeat="$6"
   local stdout="$OUT/$variant/$phase-$trial-$repeat.stdout"
   local stderr="$OUT/$variant/$phase-$trial-$repeat.stderr"
+  local start_ns end_ns wall_ms stdout_sha stderr_sha
+  start_ns="$(date +%s%N)"
   SYMTROPY_SEED_INDICES="$indices" "$binary" > "$stdout" 2> "$stderr"
-  local stdout_sha stderr_sha
+  end_ns="$(date +%s%N)"
+  wall_ms=$(((end_ns-start_ns)/1000000))
   stdout_sha="$(sha256sum "$stdout" | awk '{print $1}')"
   stderr_sha="$(sha256sum "$stderr" | awk '{print $1}')"
-  printf '%s,%s\n' "$stdout_sha" "$stderr_sha"
+  printf '%s,%s,%s\n' "$wall_ms" "$stdout_sha" "$stderr_sha"
 }
 
 printf 'toolchain,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes,runtime_repeat,runtime_ms,stdout_sha256\n' > "$OUT/metadata/runtime.csv"
@@ -171,9 +174,10 @@ TRAIN_OUT=()
 TRAIN_ERR=()
 for repeat in 1 2; do
   PAIR="$(run_seed_set instrumented "$INSTR_BIN" "$TRAIN_INDICES" training 0 "$repeat")"
-  TRAIN_OUT+=( "${PAIR%%,*}" )
-  TRAIN_ERR+=( "${PAIR##*,}" )
-  printf 'instrumentation,training,0,%s,%s,%s,%s\n' "$repeat" "$TRAIN_INDICES" "${PAIR%%,*}" "${PAIR##*,}" >> "$OUT/metadata/output-digests.csv"
+  PAIR_REST="${PAIR#*,}"
+  TRAIN_OUT+=( "${PAIR_REST%%,*}" )
+  TRAIN_ERR+=( "${PAIR_REST##*,}" )
+  printf 'instrumentation,training,0,%s,%s,%s,%s,%s\n' "$repeat" "$TRAIN_INDICES" "${PAIR%%,*}" "${PAIR_REST%%,*}" "${PAIR_REST##*,}" >> "$OUT/metadata/output-digests.csv"
 done
 [[ "${TRAIN_OUT[0]}" == "${TRAIN_OUT[1]}" && "${TRAIN_ERR[0]}" == "${TRAIN_ERR[1]}" ]] || die "instrumented training outputs are not deterministic"
 
@@ -183,8 +187,9 @@ TRAIN_BASE_BUILD="$(build_example "$TRAIN_BASE_TARGET" "$EXAMPLE" "-Cdebuginfo=l
 TRAIN_BASE_BIN="$TRAIN_BASE_TARGET/$TARGET/release/examples/$EXAMPLE"
 [[ -x "$TRAIN_BASE_BIN" ]] || die "no-PGO training control binary missing"
 TRAIN_BASE_PAIR="$(run_seed_set no-pgo "$TRAIN_BASE_BIN" "$TRAIN_INDICES" training-control 0 1)"
-[[ "${TRAIN_BASE_PAIR%%,*}" == "${TRAIN_OUT[0]}" && "${TRAIN_BASE_PAIR##*,}" == "${TRAIN_ERR[0]}" ]] || die "instrumentation training output differs from no-PGO training control"
-printf 'no-pgo,training-control,0,1,%s,%s,%s\n' "$TRAIN_INDICES" "${TRAIN_BASE_PAIR%%,*}" "${TRAIN_BASE_PAIR##*,}" >> "$OUT/metadata/output-digests.csv"
+TRAIN_BASE_REST="${TRAIN_BASE_PAIR#*,}"
+[[ "${TRAIN_BASE_REST%%,*}" == "${TRAIN_OUT[0]}" && "${TRAIN_BASE_REST##*,}" == "${TRAIN_ERR[0]}" ]] || die "instrumentation training output differs from no-PGO training control"
+printf 'no-pgo,training-control,0,1,%s,%s,%s,%s\n' "$TRAIN_INDICES" "${TRAIN_BASE_PAIR%%,*}" "${TRAIN_BASE_REST%%,*}" "${TRAIN_BASE_REST##*,}" >> "$OUT/metadata/output-digests.csv"
 
 rustup component add llvm-tools-preview --toolchain "$TOOLCHAIN"
 SYSROOT="$(rustup run "$TOOLCHAIN" rustc --print sysroot)"
@@ -235,35 +240,25 @@ for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
   pgo_bin="$PGO_ROOT/trial-$trial/$TARGET/release/examples/$EXAMPLE"
   for ((repeat=1; repeat<=RUNTIME_REPEATS; repeat++)); do
     if (((trial+repeat)%2==0)); then
-      START_NS="$(date +%s%N)"
       PGO_PAIR="$(run_seed_set instrumentation-pgo "$pgo_bin" "$HOLDOUT_INDICES" holdout "$trial" "$repeat")"
-      END_NS="$(date +%s%N)"
-      PGO_MS=$(((END_NS-START_NS)/1000000))
-      START_NS="$(date +%s%N)"
       BASE_PAIR="$(run_seed_set no-pgo "$base_bin" "$HOLDOUT_INDICES" holdout "$trial" "$repeat")"
-      END_NS="$(date +%s%N)"
-      BASE_MS=$(((END_NS-START_NS)/1000000))
     else
-      START_NS="$(date +%s%N)"
       BASE_PAIR="$(run_seed_set no-pgo "$base_bin" "$HOLDOUT_INDICES" holdout "$trial" "$repeat")"
-      END_NS="$(date +%s%N)"
-      BASE_MS=$(((END_NS-START_NS)/1000000))
-      START_NS="$(date +%s%N)"
       PGO_PAIR="$(run_seed_set instrumentation-pgo "$pgo_bin" "$HOLDOUT_INDICES" holdout "$trial" "$repeat")"
-      END_NS="$(date +%s%N)"
-      PGO_MS=$(((END_NS-START_NS)/1000000))
     fi
-    BASE_OUT="${BASE_PAIR%%,*}"; BASE_ERR="${BASE_PAIR##*,}"
-    PGO_OUT="${PGO_PAIR%%,*}"; PGO_ERR="${PGO_PAIR##*,}"
+    BASE_MS="${BASE_PAIR%%,*}"; BASE_REST="${BASE_PAIR#*,}"
+    BASE_OUT="${BASE_REST%%,*}"; BASE_ERR="${BASE_REST##*,}"
+    PGO_MS="${PGO_PAIR%%,*}"; PGO_REST="${PGO_PAIR#*,}"
+    PGO_OUT="${PGO_REST%%,*}"; PGO_ERR="${PGO_REST##*,}"
     [[ "$BASE_OUT" == "$PGO_OUT" && "$BASE_ERR" == "$PGO_ERR" ]] || {
       printf 'OUTPUT_REVIEW_REQUIRED: PGO changed held-out output for %s trial=%s repeat=%s\n' "$EXAMPLE" "$trial" "$repeat" | tee -a "$OUT/STATUS.txt"
       exit 3
     }
     for variant in no-pgo instrumentation-pgo; do
       if [[ "$variant" == no-pgo ]]; then
-        current="$BASE_PAIR"; runtime_ms="$BASE_MS"; build_ms="${BASE_BUILD_MS[$trial]}"; rss="${BASE_BUILD_RSS[$trial]}"; target_bytes="${BASE_BYTES[$trial]}"; binary_bytes="${BASE_BINARY[$trial]}"
+        current="$BASE_REST"; runtime_ms="$BASE_MS"; build_ms="${BASE_BUILD_MS[$trial]}"; rss="${BASE_BUILD_RSS[$trial]}"; target_bytes="${BASE_BYTES[$trial]}"; binary_bytes="${BASE_BINARY[$trial]}"
       else
-        current="$PGO_PAIR"; runtime_ms="$PGO_MS"; build_ms="${PGO_BUILD_MS[$trial]}"; rss="${PGO_BUILD_RSS[$trial]}"; target_bytes="${PGO_BYTES[$trial]}"; binary_bytes="${PGO_BINARY[$trial]}"
+        current="$PGO_REST"; runtime_ms="$PGO_MS"; build_ms="${PGO_BUILD_MS[$trial]}"; rss="${PGO_BUILD_RSS[$trial]}"; target_bytes="${PGO_BYTES[$trial]}"; binary_bytes="${PGO_BINARY[$trial]}"
       fi
       out_sha="${current%%,*}"; err_sha="${current##*,}"
       key="$variant:$trial"
