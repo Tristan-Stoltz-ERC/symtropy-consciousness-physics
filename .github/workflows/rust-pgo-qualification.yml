@@ -5,6 +5,9 @@ on:
       - "scripts/run-rust-pgo-instrumented.sh"
       - "scripts/run-rust-pgo-seed-holdout.sh"
       - "src/experiment_seed.rs"
+      - "src/paired_inference.rs"
+      - "examples/cooperation_paired_analysis.rs"
+      - "Cargo.toml"
       - "src/lib.rs"
       - "examples/jphi_convergence.rs"
       - "examples/gradient_replacement.rs"
@@ -83,6 +86,9 @@ jobs:
           bash -n scripts/run-rust-sample-pgo.sh
           grep -F 'pub const DEFAULT_SEED_BASE: u64 = 42;' src/experiment_seed.rs
           grep -F 'pub const DEFAULT_SEED_STRIDE: u64 = 997;' src/experiment_seed.rs
+          grep -F 'pub mod paired_inference;' src/lib.rs
+          grep -F 'unused_dependencies = "warn"' Cargo.toml
+          jq -e '.schema == "luminous.symtropy.paired-inference.v0.1"' benchmarks/paired-inference/contract-v0.1.json
           grep -F 'default_schedule_preserves_historical_seed_values' src/experiment_seed.rs
           grep -F 'for &seed in seed_schedule.seeds()' examples/jphi_convergence.rs
           grep -F 'for &seed in seed_schedule.seeds()' examples/gradient_replacement.rs
@@ -263,20 +269,73 @@ jobs:
           rustup toolchain install 1.100.0 --profile minimal --component rustfmt
           [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
           [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+      - name: Verify Rust 1.99.1 tolerates global Cargo 1.100 policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.99.1 --profile minimal
+          temp_cargo_home="$(mktemp -d)"
+          trap 'rm -rf "$temp_cargo_home"' EXIT
+          cat > "$temp_cargo_home/config.toml" <<'CARGO_CONFIG'
+          [resolver]
+          incompatible-publish-age = "deny"
+
+          [registry]
+          global-min-publish-age = "14 days"
+          CARGO_CONFIG
+          CARGO_HOME="$temp_cargo_home" cargo +1.99.1 metadata --format-version 1 --locked --no-deps > /dev/null
       - name: Format the seed schedule and selectable experiment programs
         run: |
           set -euo pipefail
           rustup run 1.100.0 rustfmt --edition 2021 --check \
             src/experiment_seed.rs \
+            src/paired_inference.rs \
+            examples/cooperation_paired_analysis.rs \
             examples/jphi_convergence.rs \
             examples/gradient_replacement.rs \
             examples/cooperation_decomposition.rs
       - name: Run the default and disjoint-index seed schedule unit tests
         run: cargo +1.100.0 test --locked --lib experiment_seed::tests
+      - name: Run seed-keyed paired inference adversarial tests
+        run: cargo +1.100.0 test --locked --lib paired_inference::tests
       - name: Compile all three supported seed-selectable experiment examples
         run: |
           cargo +1.100.0 check --locked --example jphi_convergence
           cargo +1.100.0 check --locked --example gradient_replacement
           cargo +1.100.0 check --locked --example cooperation_decomposition
+          cargo +1.100.0 check --locked --example cooperation_paired_analysis
+      - name: Exercise paired CSV analyzer on a synthetic matched fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          cat > "$temp_dir/cooperation.csv" <<'CSV'
+          condition,seed,alive,energy,cooperation,well_energy,resonance_energy
+          CTRL,100,3,5,2,4,1
+          CTRL,200,4,6,3,5,2
+          TREAT,100,5,8,4,7,3
+          TREAT,200,8,10,6,8,5
+          CSV
+          cargo +1.100.0 run --locked --example cooperation_paired_analysis -- \
+            --input "$temp_dir/cooperation.csv" \
+            --control CTRL \
+            --treatment TREAT \
+            --metric alive \
+            --bootstrap-replicates 1000 \
+            --equivalence-margin 5 \
+            --margin-rationale synthetic-preregistered-contract \
+            --input-sha256 "$(sha256sum "$temp_dir/cooperation.csv" | cut -d ' ' -f 1)" \
+            > "$temp_dir/receipt.json"
+          jq -e '
+            .schema == "luminous.symtropy.paired-analysis-receipt.v0.1" and
+            .status == "analysis_only_not_historical_verdict" and
+            .n == 2 and
+            .seed_ids == [100, 200] and
+            (.input_sha256 | length) == 64 and
+            .paired_summary.mean_difference == 3 and
+            .sign_flip.exact == true and
+            .equivalence_screen.status == "equivalent_within_margin"
+          ' "$temp_dir/receipt.json"
       - name: Enforce lockfile immutability
         run: git diff --exit-code -- Cargo.lock
