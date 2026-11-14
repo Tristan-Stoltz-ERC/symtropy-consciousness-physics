@@ -155,7 +155,7 @@ run_seed_set() {
   local stderr="$OUT/$variant/$phase-$trial-$repeat.stderr"
   local start_ns end_ns wall_ms stdout_sha stderr_sha
   start_ns="$(date +%s%N)"
-  SYMTROPY_SEED_INDICES="$indices" "$binary" > "$stdout" 2> "$stderr"
+  env -u SYMTROPY_SEED_START_INDEX -u SYMTROPY_SEED_COUNT SYMTROPY_SEED_INDICES="$indices" "$binary" > "$stdout" 2> "$stderr"
   end_ns="$(date +%s%N)"
   wall_ms=$(((end_ns-start_ns)/1000000))
   stdout_sha="$(sha256sum "$stdout" | awk '{print $1}')"
