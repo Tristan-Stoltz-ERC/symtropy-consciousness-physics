@@ -34,7 +34,7 @@ const TICKS: usize = 3000;
 const SEEDS: usize = 30;
 
 #[derive(Clone, Copy)]
-enum PhiMetric {
+enum ScalarControl {
     Entropy,
     RandomLegacy,
     RandomEvent,
@@ -42,7 +42,7 @@ enum PhiMetric {
     Zero,
 }
 
-impl PhiMetric {
+impl ScalarControl {
     fn name(&self) -> &'static str {
         match self {
             Self::Entropy => "ENTROPY_PROXY",
@@ -99,7 +99,7 @@ fn event_random_control(replicate_seed: u64, tick: u64, agent_idx: usize) -> f64
     .uniform_open01(0)
 }
 
-fn run(metric: PhiMetric, seed: u64) -> RunResult {
+fn run(metric: ScalarControl, seed: u64) -> RunResult {
     let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, 0.0]));
     let mut consciousness = ConsciousnessField::<2>::new();
     consciousness.constants = ThermodynamicConstants {
@@ -133,7 +133,7 @@ fn run(metric: PhiMetric, seed: u64) -> RunResult {
     }
 
     for tick in 0..TICKS {
-        // Consciousness with METRIC-SPECIFIC Phi
+        // Apply the selected scalar control as ConsciousnessInputs.phi
         for (idx, &h) in handles.iter().enumerate() {
             let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
             let phi_value = metric.compute(ef, tick as u64, idx, seed);
@@ -215,15 +215,16 @@ fn main() {
     println!("random_event_key=(replicate_seed, namespace)");
     println!("random_event_counter=(stable_agent_id, tick, event_kind, purpose, occurrence)");
     println!("actual_phi_equation=NOT_MEASURED");
+    println!("phi_input_semantics=supplied_scalar_not_equation_output");
     println!("legacy_random_control=does_not_include_replicate_seed");
     println!();
 
     let metrics = [
-        PhiMetric::Entropy,
-        PhiMetric::RandomLegacy,
-        PhiMetric::RandomEvent,
-        PhiMetric::Constant,
-        PhiMetric::Zero,
+        ScalarControl::Entropy,
+        ScalarControl::RandomLegacy,
+        ScalarControl::RandomEvent,
+        ScalarControl::Constant,
+        ScalarControl::Zero,
     ];
 
     println!("{:<12} {:<12} {:<12} {:<12} {:<12}", "Metric", "Clustering", "95% CI", "Alive", "Energy");
