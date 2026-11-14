@@ -20,6 +20,7 @@ verify_hash() {
     echo "input digest mismatch: $file" >&2; return 1;
   }
 }
+verify_hash cargo_metadata_sha256 "$OUTPUT/cargo-metadata.json"
 verify_hash cargo_messages_sha256 "$OUTPUT/cargo-messages.jsonl"
 verify_hash diagnostics_sha256 "$OUTPUT/diagnostics.log"
 verify_hash rustc_version_file_sha256 "$OUTPUT/rustc-version.txt"
