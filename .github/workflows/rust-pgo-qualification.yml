@@ -245,3 +245,38 @@ jobs:
           path: ${{ runner.temp }}/symtropy-pgo-seed-holdout/
           if-no-files-found: warn
           retention-days: 30
+
+  seed-schedule-qualification:
+    if: github.event_name == 'pull_request'
+    name: Exact seed schedule contract (Rust 1.100.0)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install exact Rust/Cargo and rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal --component rustfmt
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+      - name: Format the seed schedule and selectable experiment programs
+        run: |
+          set -euo pipefail
+          rustup run 1.100.0 rustfmt --edition 2021 --check \
+            src/experiment_seed.rs \
+            examples/jphi_convergence.rs \
+            examples/gradient_replacement.rs \
+            examples/cooperation_decomposition.rs
+      - name: Run the default and disjoint-index seed schedule unit tests
+        run: cargo +1.100.0 test --locked --lib experiment_seed::tests
+      - name: Compile all three supported seed-selectable experiment examples
+        run: |
+          cargo +1.100.0 check --locked --example jphi_convergence
+          cargo +1.100.0 check --locked --example gradient_replacement
+          cargo +1.100.0 check --locked --example cooperation_decomposition
+      - name: Enforce lockfile immutability
+        run: git diff --exit-code -- Cargo.lock
