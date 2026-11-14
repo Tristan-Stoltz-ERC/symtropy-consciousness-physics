@@ -8,6 +8,7 @@ on:
       - "src/event_identity.rs"
       - "src/event_lineage.rs"
       - "src/event_lineage_receipt.rs"
+      - "src/paired_inference.rs"
       - "src/lib.rs"
       - "Cargo.toml"
       - "examples/event_rng_crn_variance.rs"
@@ -16,6 +17,8 @@ on:
       - "examples/phi_ablation.rs"
       - "docs/research/PHI_ABLATION_EVENT_KEYED_RANDOM_CONTROL_V0_1.md"
       - "benchmarks/event-rng/phi-ablation-control-contract-v0.1.json"
+      - "benchmarks/paired-inference/contract-v0.1.json"
+      - "docs/research/PAIRED_INFERENCE_V0_1.md"
       - "tests/reference/philox4x64_random123.cpp"
       - "scripts/test-philox-random123-parity.sh"
       - "Cargo.toml"
@@ -73,6 +76,8 @@ jobs:
             benchmarks/event-rng/lineage-receipt-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.scalar-control-event-rng-ablation.v0.1"' \
             benchmarks/event-rng/phi-ablation-control-contract-v0.1.json
+          jq -e '.schema == "luminous.symtropy.paired-inference.v0.1"' \
+            benchmarks/paired-inference/contract-v0.1.json
           grep -F 'PHI_ABLATION_CONTROL' src/event_rng.rs
           grep -F 'RANDOM_METRIC_SAMPLE' src/event_rng.rs
           grep -F 'actual_phi_equation=NOT_MEASURED' examples/phi_ablation.rs
@@ -117,7 +122,11 @@ jobs:
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
         run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
-      - name: Test replicate-keyed Phi ablation random control
+      - name: Test seed-keyed paired inference primitives
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" test --locked --lib paired_inference::tests
+      - name: Test replicate-keyed scalar ablation random control and receipts
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
         run: cargo +"$RUST_TOOLCHAIN" test --locked --example phi_ablation
