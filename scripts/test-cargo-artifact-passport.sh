@@ -22,7 +22,7 @@ jq -cn --arg sha "$artifact_sha" --argjson size "$artifact_size" '[
   {package_id:"path+file:///fixture#fixture@0.1.0",
    target:{name:"fixture",kind:["lib"],crate_types:["lib"],src_path:"src/lib.rs",edition:"2021",doc:true,doctest:true,test:true},
    profile:{opt_level:"0"},fresh:false,has_executable:false,
-   files:[{path:"debug/deps/libfixture-123.rlib",sha256:$sha,size_bytes:$size}]}
+   files:[{root:"target",path:"debug/deps/libfixture-123.rlib",sha256:$sha,size_bytes:$size}]}
 ]' > "$OUTPUT/compiler-artifacts.json"
 
 git_commit="$(git -C "$ROOT" rev-parse HEAD)"
