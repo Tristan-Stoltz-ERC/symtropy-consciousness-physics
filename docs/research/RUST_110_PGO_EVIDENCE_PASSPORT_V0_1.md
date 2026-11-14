@@ -52,7 +52,29 @@ Implemented pilot:
 - build time, compiler peak RSS, target bytes, binary bytes and each raw output digest are retained outside the repository.
 
 
-The current examples are **different workloads**, not an IID split of one task. The first experiment is therefore an explicit cross-example profile-transfer probe. It cannot establish generalization to every workload. A future experiment should refactor the simulation runner into a parameterized common executable with disjoint training/holdout seed manifests before making stronger generalization claims.
+The three existing examples are **different workloads**, not an IID split of one task. The cross-example tournament remains an explicit profile-transfer probe; it cannot establish generalization within one workload or to every workload.
+
+### Same-program disjoint seed holdout
+
+A second, stronger validation mode is now implemented under `scripts/run-rust-pgo-seed-holdout.sh`:
+
+- The same example executable is built with instrumentation PGO and receives a declared training index set.
+- A separate no-PGO build runs the same training indices; its stdout and stderr must exactly match the instrumented training execution.
+- The derived profile is then used for fresh no-PGO and PGO release builds.
+- Both builds are evaluated only on a disjoint held-out logical seed-index set from that same example.
+- The held-out outputs must match exactly for every paired run, every repeat and every independent fresh build.
+- Runtime timing wraps only the simulation process; hashing and receipt generation happen outside the measured interval.
+- The receipt binds the seed indices, mapped seed values, exact example, source commit/tree, compiler/Cargo/LLVM, Cargo.lock, flags and profile digest.
+
+The new library helper, `ExperimentSeedSchedule`, preserves the historic mapping (seed(i)=42+997i). No environment selector means the examples use the same seed values, ordering and default counts as before. The additional schedule identity is printed only when an override is supplied, preserving historical default stderr. Opt-in selectors are `SYMTROPY_SEED_INDICES` or the range pair `SYMTROPY_SEED_START_INDEX` plus `SYMTROPY_SEED_COUNT`; conflicting, duplicated, malformed, overflowing and oversized requests fail closed.
+
+Default PGO holdout partition:
+- training logical indices: 0–9;
+- held-out logical indices: 10–19;
+- same program/example for both partitions;
+- exact seed mapping remains 42 + 997 × index.
+
+This is an IID-like disjoint seed split within a fixed deterministic simulator and configuration, not evidence of generalization to new model structures, physical environments, hardware, or other experiment programs. The original cross-example profile-transfer mode remains valuable and separate. Neither mode is a PGO performance result until the experiment is run and analyzed.
 
 ### Sample-based PGO
 
