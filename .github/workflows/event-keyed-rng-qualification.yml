@@ -15,11 +15,14 @@ on:
       - "examples/event_rng_throughput.rs"
       - "examples/event_rng_reference_corpus.rs"
       - "examples/phi_ablation.rs"
+      - "examples/gradient_replacement.rs"
       - "docs/research/PHI_ABLATION_EVENT_KEYED_RANDOM_CONTROL_V0_1.md"
       - "benchmarks/event-rng/phi-ablation-control-contract-v0.1.json"
       - "benchmarks/paired-inference/contract-v0.1.json"
       - "benchmarks/event-rng/paired-ablation-receipt-contract-v0.1.json"
       - "docs/research/SCALAR_ABLATION_PAIRED_RECEIPTS_V0_1.md"
+      - "docs/research/GRADIENT_REPLACEMENT_EVENT_RNG_PAIRED_V0_1.md"
+      - "benchmarks/event-rng/gradient-replacement-event-paired-contract-v0.1.json"
       - "docs/research/PAIRED_INFERENCE_V0_1.md"
       - "tests/reference/philox4x64_random123.cpp"
       - "scripts/test-philox-random123-parity.sh"
@@ -82,6 +85,11 @@ jobs:
             benchmarks/paired-inference/contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.paired-ablation-receipt.v0.1"' \
             benchmarks/event-rng/paired-ablation-receipt-contract-v0.1.json
+          jq -e '.schema == "luminous.symtropy.gradient-replacement-event-rng-paired.v0.1"' \
+            benchmarks/event-rng/gradient-replacement-event-paired-contract-v0.1.json
+          grep -F 'SYMTROPY_GRADIENT_REPLACEMENT_RNG' examples/gradient_replacement.rs
+          grep -F 'PAIRED_CONTROLLER_JSON=' examples/gradient_replacement.rs
+          grep -F 'paired_p_values=NOT_EVALUATED_SIGN_EXCHANGEABILITY_UNQUALIFIED' examples/gradient_replacement.rs
           grep -F 'PAIRED_ANALYSIS_JSON=' examples/phi_ablation.rs
           grep -F 'paired_p_values=NOT_EVALUATED_SIGN_EXCHANGEABILITY_UNQUALIFIED' examples/phi_ablation.rs
           grep -F 'PHI_ABLATION_CONTROL' src/event_rng.rs
@@ -127,7 +135,39 @@ jobs:
       - name: Format RNG module and CRN benchmark
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
-        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs src/paired_inference.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
+        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs src/paired_inference.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs examples/gradient_replacement.rs
+      - name: Test event-addressed gradient-replacement random walk
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" test --locked --example gradient_replacement
+      - name: Execute and parse synthetic gradient-replacement paired receipts
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SYMTROPY_GRADIENT_REPLACEMENT_RNG=event \
+            rustup run "$RUST_TOOLCHAIN" cargo run --locked --example gradient_replacement -- --receipt-smoke \
+            > "$RUNNER_TEMP/gradient-replacement-smoke.log"
+          sed -n 's/^PAIRED_CONTROLLER_JSON=//p' \
+            "$RUNNER_TEMP/gradient-replacement-smoke.log" \
+            > "$RUNNER_TEMP/gradient-replacement-receipts.jsonl"
+          test "$(wc -l < "$RUNNER_TEMP/gradient-replacement-receipts.jsonl")" -eq 20
+          jq -se '
+            length == 20 and
+            all(.[]; 
+              .schema == "luminous.symtropy.gradient-replacement-paired-receipt.v0.1" and
+              .rng_mode == "event_addressed_philox4x64_10" and
+              .n == 20 and
+              (.seed_ids | length) == 20 and
+              .bootstrap.replicates == 20000 and
+              .bootstrap.confidence_level == 0.95 and
+              .sign_flip.status == "not_evaluated" and
+              .equivalence.status == "not_evaluated" and
+              (has("p_value") | not)
+            )
+          ' "$RUNNER_TEMP/gradient-replacement-receipts.jsonl"
+          sha256sum "$RUNNER_TEMP/gradient-replacement-receipts.jsonl"
       - name: Test seed-keyed paired inference primitives
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
