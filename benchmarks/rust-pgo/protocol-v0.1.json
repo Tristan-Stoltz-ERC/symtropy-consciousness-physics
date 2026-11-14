@@ -19,6 +19,25 @@
       ]
     },
     {
+      "id": "instrumentation-pgo-same-program-seed-holdout",
+      "profile_generation": "instrumentation PGO on one selected example",
+      "profile_consumption_flag": "-Cprofile-use",
+      "same_program_training_and_holdout": true,
+      "default_training_logical_indices": "0..9",
+      "default_holdout_logical_indices": "10..19",
+      "seed_formula": "42 + 997 * logical_index",
+      "train_and_holdout_disjoint": true,
+      "profile_collection_scope": "training indices only",
+      "runtime_measurement_scope": "held-out indices only",
+      "exact_training_output_equivalence": true,
+      "exact_heldout_stdout_and_stderr_equivalence": true,
+      "target_example_options": [
+        "jphi_convergence",
+        "gradient_replacement",
+        "cooperation_decomposition"
+      ]
+    },
+    {
       "id": "sample-pgo",
       "generate_method": "perf branch-stack sampling + llvm-profgen",
       "consume_flag": "-Cprofile-sample-use",
@@ -39,7 +58,12 @@
     "Cargo features",
     "training workload identifiers",
     "experiment seed schedule",
-    "profile sha256"
+    "profile sha256",
+    "logical training seed-index set",
+    "logical held-out seed-index set",
+    "mapped deterministic seed values",
+    "same-program experiment target identity",
+    "training and holdout disjointness receipt"
   ],
   "proposed_acceptance": {
     "median_runtime_improvement_training_min_percent": 5,
@@ -58,7 +82,9 @@
     "cross-example transfer is not an IID held-out split",
     "PMU unavailability is NOT_EVALUABLE, not PASS or FAIL for compiler compatibility",
     "sample and instrumentation profiles are not interchangeable",
-    "Runtime repeats nested inside one build trial do not increase the count of independent compiler/build trials"
+    "Runtime repeats nested inside one build trial do not increase the count of independent compiler/build trials",
+    "same-program seed holdout is a within-example disjoint-seed validation, not cross-example or physical-world generalization",
+    "PASS_MECHANICAL_PROFILE_AND_HELDOUT_OUTPUT_CHECKS does not establish a speedup"
   ],
   "experiment_design": {
     "build_repeats_default": 5,
@@ -67,7 +93,19 @@
     "rotate_build_and_runtime_order": true,
     "match_debug_info_flags_between_variants": true,
     "measure_compile_time_and_peak_rss_per_build_trial": true,
-    "nested_runtime_repeats_are_not_independent_build_trials": true
+    "nested_runtime_repeats_are_not_independent_build_trials": true,
+    "same_program_seed_holdout": {
+      "enabled_by_explicit_workflow_dispatch": true,
+      "preserves_historical_default_seed_schedule": true,
+      "default_seed_formula": "42 + 997 * logical_index",
+      "default_training_indices": "0..9",
+      "default_holdout_indices": "10..19",
+      "rejects_train_holdout_overlap": true,
+      "requires_training_output_match_between_instrumented_and_no_pgo": true,
+      "requires_heldout_stdout_and_stderr_match": true,
+      "repeats_heldout_execution_within_each_fresh_build_trial": true,
+      "runtime_timer_excludes_hashing_and_receipt_generation": true
+    }
   },
   "evidence_integrity": {
     "run_manifest": "metadata/run-manifest.txt",
