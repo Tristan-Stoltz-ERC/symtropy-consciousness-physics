@@ -3,13 +3,14 @@ set -Eeuo pipefail
 ROOT="$(mktemp -d)"
 OUTPUT="$(mktemp -d)"
 trap 'rm -rf "$ROOT" "$OUTPUT"' EXIT
-mkdir -p "$ROOT" "$OUTPUT/target/debug/deps" "$OUTPUT/build"
+mkdir -p "$ROOT" "$OUTPUT/target/debug/deps" "$OUTPUT/build/out"
 printf 'lock-v1\n' > "$ROOT/Cargo.lock"
 printf '[package]\nname="fixture"\nversion="0.1.0"\n' > "$ROOT/Cargo.toml"
 git -C "$ROOT" init -q
 git -C "$ROOT" add Cargo.lock Cargo.toml
 git -C "$ROOT" -c user.name=PassportTest -c user.email=passport@example.invalid commit -qm fixture
 printf 'rlib-content\n' > "$OUTPUT/target/debug/deps/libfixture-123.rlib"
+printf 'build-output-content\n' > "$OUTPUT/build/out/libfixture-build-output.rlib"
 printf '{"packages":[],"workspace_members":[]}\n' > "$OUTPUT/cargo-metadata.json"
 printf 'rustc 1.100.0\nhost: x86_64-unknown-linux-gnu\ncommit-hash: fixture\n' > "$OUTPUT/rustc-version.txt"
 printf 'cargo 1.100.0\n' > "$OUTPUT/cargo-version.txt"
@@ -18,11 +19,16 @@ printf 'diagnostics empty\n' > "$OUTPUT/diagnostics.log"
 sha256_file() { sha256sum -- "$1" | awk '{print $1}'; }
 artifact_sha="$(sha256_file "$OUTPUT/target/debug/deps/libfixture-123.rlib")"
 artifact_size="$(stat -c '%s' "$OUTPUT/target/debug/deps/libfixture-123.rlib")"
-jq -cn --arg sha "$artifact_sha" --argjson size "$artifact_size" '[
+build_sha="$(sha256_file "$OUTPUT/build/out/libfixture-build-output.rlib")"
+build_size="$(stat -c '%s' "$OUTPUT/build/out/libfixture-build-output.rlib")"
+jq -cn --arg sha "$artifact_sha" --argjson size "$artifact_size" --arg build_sha "$build_sha" --argjson build_size "$build_size" '[
   {package_id:"path+file:///fixture#fixture@0.1.0",
    target:{name:"fixture",kind:["lib"],crate_types:["lib"],src_path:"src/lib.rs",edition:"2021",doc:true,doctest:true,test:true},
    profile:{opt_level:"0"},fresh:false,has_executable:false,
-   files:[{root:"target",path:"debug/deps/libfixture-123.rlib",sha256:$sha,size_bytes:$size}]}
+   files:[
+     {root:"target",path:"debug/deps/libfixture-123.rlib",sha256:$sha,size_bytes:$size},
+     {root:"build",path:"out/libfixture-build-output.rlib",sha256:$build_sha,size_bytes:$build_size}
+   ]}
 ]' > "$OUTPUT/compiler-artifacts.json"
 
 git_commit="$(git -C "$ROOT" rev-parse HEAD)"
