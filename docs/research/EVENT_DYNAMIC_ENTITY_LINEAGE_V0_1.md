@@ -32,6 +32,8 @@ LineageIdRegistry maintains both directions:
 - BirthKey -> SubjectId
 - SubjectId -> BirthKey
 
+It exposes a deterministic assignment export sorted by SubjectId. Each receipt retains the complete BirthKey, not just the compact u64, and is independent of registration order.
+
 It also accepts a reservation set for pre-existing static, global and pair identities.
 
 Required use:
@@ -39,7 +41,7 @@ Required use:
 2. Use one run-scoped registry across the counterfactual alternatives whose entity identities are meant to align.
 3. Resolve a BirthKey. Repeated resolution of the same key is idempotent.
 4. Treat a collision or late static reservation as a hard qualification failure.
-5. Preserve the full BirthKey in the run evidence ledger; do not retain only the derived u64.
+5. Export the registry's sorted assignment receipts and preserve the full BirthKey in the run evidence ledger; do not retain only the derived u64.
 
 A collision is not repaired by assigning a new ID because that would make identity dependent on whichever event was processed first. Qualification fails closed.
 
