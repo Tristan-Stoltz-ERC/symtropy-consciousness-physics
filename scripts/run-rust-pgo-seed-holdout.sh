@@ -46,8 +46,6 @@ validate_seed_list() {
   (( ${#values[@]} > 0 )) || die "$label seed-index list must not be empty"
   (( ${#values[@]} <= 10000 )) || die "$label seed-index list exceeds 10000 entries"
   for item in "${values[@]}"; do
-    item="${item#"\${item%%[![:space:]]*}"}"
-    item="${item%"\${item##*[![:space:]]}"}"
     [[ "$item" =~ ^(0|[1-9][0-9]*)$ ]] || die "$label contains non-canonical seed index '$item'"
     [[ -z "${seen[$item]+present}" ]] || die "$label contains duplicate seed index '$item'"
     seen["$item"]=1
