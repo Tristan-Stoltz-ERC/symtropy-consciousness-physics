@@ -38,3 +38,8 @@ required-features = ["consciousness-curvature"]
 [[example]]
 name = "event_rng_crn_variance"
 path = "examples/event_rng_crn_variance.rs"
+
+# Layered raw generator, event-address, and historical LCG microbenchmark.
+[[example]]
+name = "event_rng_throughput"
+path = "examples/event_rng_throughput.rs"
