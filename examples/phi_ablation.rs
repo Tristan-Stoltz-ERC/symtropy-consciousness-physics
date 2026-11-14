@@ -1,11 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! PHI ABLATION: Does the consciousness metric matter?
+//! SCALAR CONTROL ABLATION: How do alternative scalar inputs compare?
 //!
 //! Tests whether clustering depends on the supplied scalar input or whether
 //! entropy, random, constant, and zero controls produce similar outcomes.
 //!
-//! 5 metric conditions × 30 seeds × 5000 ticks = 150 runs
+//! 5 scalar controls × 30 matched seeds × 3000 ticks = 150 runs
 //!
 //! Conditions:
 //! 1. ENTROPY:       Shannon entropy proxy of agent energy fraction
