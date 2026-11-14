@@ -163,7 +163,7 @@ run_seed_set() {
 }
 
 printf 'toolchain,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes,runtime_repeat,runtime_ms,stdout_sha256\n' > "$OUT/metadata/runtime.csv"
-printf 'variant,phase,trial,repeat,seed_indices,stdout_sha256,stderr_sha256\n' > "$OUT/metadata/output-digests.csv"
+printf 'variant,phase,trial,repeat,seed_indices,runtime_ms,stdout_sha256,stderr_sha256\n' > "$OUT/metadata/output-digests.csv"
 printf 'variant,trial,example,build_ms,max_rss_kib,target_bytes,binary_bytes,binary_sha256\n' > "$OUT/metadata/builds.csv"
 
 # Instrumentation profile training is restricted to the training index set.
@@ -204,7 +204,7 @@ LLVM_PROFDATA_VERSION="$("$LLVM_PROFDATA" --version 2>&1 | head -n1)"
 
 declare -A BASE_BUILD_MS BASE_BUILD_RSS BASE_BYTES BASE_BINARY BASE_BINARY_SHA
 declare -A PGO_BUILD_MS PGO_BUILD_RSS PGO_BYTES PGO_BINARY PGO_BINARY_SHA
-declare -A BASE_DIGEST PGO_DIGEST
+declare -A BASE_DIGEST GLOBAL_DIGEST
 
 # Paired fresh builds. Each build trial yields two independent release artifacts.
 for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
@@ -268,9 +268,14 @@ for ((trial=1; trial<=BUILD_REPEATS; trial++)); do
       else
         [[ "${BASE_DIGEST[$key]}" == "$digest_pair" ]] || die "held-out output drift across repeats for $variant trial=$trial"
       fi
+      if [[ -z "${GLOBAL_DIGEST[$variant]+present}" ]]; then
+        GLOBAL_DIGEST["$variant"]="$digest_pair"
+      else
+        [[ "${GLOBAL_DIGEST[$variant]}" == "$digest_pair" ]] || die "held-out output drift across fresh builds for $variant"
+      fi
       printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
         "$variant" "$trial" "$EXAMPLE" "$build_ms" "$rss" "$target_bytes" "$binary_bytes" "$repeat" "$runtime_ms" "$out_sha" >> "$OUT/metadata/runtime.csv"
-      printf '%s,holdout,%s,%s,%s,%s,%s\n' "$variant" "$trial" "$repeat" "$HOLDOUT_INDICES" "$out_sha" "$err_sha" >> "$OUT/metadata/output-digests.csv"
+      printf '%s,holdout,%s,%s,%s,%s,%s,%s\n' "$variant" "$trial" "$repeat" "$HOLDOUT_INDICES" "$runtime_ms" "$out_sha" "$err_sha" >> "$OUT/metadata/output-digests.csv"
     done
   done
 done
