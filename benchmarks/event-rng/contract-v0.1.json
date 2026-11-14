@@ -1,0 +1,73 @@
+{
+  "schema": "luminous.symtropy.event-keyed-rng.v0.1",
+  "status": "research_specification_only",
+  "historical_rng": {
+    "mode": "legacy_stateful_lcg",
+    "immutable": true,
+    "default_seed_formula": "42 + 997 * logical_seed_index"
+  },
+  "candidate": {
+    "algorithm": "philox4x64-10",
+    "cryptographic_security": false,
+    "key_words_u64": ["replicate_seed", "experiment_namespace"],
+    "counter_words_u64": ["subject_id", "simulation_tick", "packed_event_code", "draw_block_index"],
+    "output_words_u64": 4,
+    "draw_index": {
+      "block": "draw_index / 4",
+      "lane": "draw_index % 4"
+    }
+  },
+  "packed_event_code": {
+    "event_kind_bits": 16,
+    "purpose_bits": 16,
+    "occurrence_ordinal_bits": 32,
+    "tag_registry": "explicit_versioned_numeric_codes",
+    "overflow": "fail_closed"
+  },
+  "identity_rules": {
+    "exclude": [
+      "scenario_or_treatment_label",
+      "controller_branch",
+      "thread_id",
+      "execution_order",
+      "wall_clock",
+      "mutable_population_summary",
+      "intervention_dependent_state"
+    ],
+    "agent_id": "stable_u32",
+    "global_environment_subject_id": 0,
+    "pair_subject_id": "(min_agent_id << 32) | max_agent_id",
+    "dynamic_entity_identity": "stable_parent_identity_plus_within_parent_birth_ordinal"
+  },
+  "sampling": {
+    "pure_function_of_key_and_counter": true,
+    "draw_index_explicit": true,
+    "rejection_attempts_event_local": true,
+    "semantic_event_sampled_once_and_retained": true,
+    "uniform_conversion": "documented_top_53_bit_open_interval_mapping"
+  },
+  "qualification": {
+    "execution_order_invariance": "all matched event tuples bit-identical",
+    "branch_draw_isolation": "unrelated conditional draws cannot shift existing event values",
+    "parallel_reproducibility": "serial_and_parallel_event_outputs_bit-identical",
+    "reference_vectors": "required",
+    "distribution_battery": ["TestU01/BigCrush", "PractRand"],
+    "causal_fixture": "analytically_known_toy_structural_causal_model",
+    "performance_trials": "30 randomized paired A/B blocks for confirmatory claims",
+    "end_to_end_overhead": "report including event-key construction"
+  },
+  "promotion": {
+    "requires_independent_event_semantics_review": true,
+    "requires_reference_vector_and_distribution_qualification": true,
+    "requires_matched_performance_evidence": true,
+    "legacy_lcg_output_hashes_unchanged": true,
+    "historical_verdicts_unchanged": true
+  },
+  "nonclaims": [
+    "not_implemented",
+    "not_a_cryptographic_rng",
+    "event_identity_is_a_scientific_modeling_decision",
+    "shared_randomness_does_not_guarantee_variance_reduction",
+    "execution_invariance_is_necessary_but_not_sufficient_for_causal_validity"
+  ]
+}
