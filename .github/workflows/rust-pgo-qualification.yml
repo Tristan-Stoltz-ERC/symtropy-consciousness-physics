@@ -6,6 +6,7 @@ on:
       - "scripts/run-rust-pgo-seed-holdout.sh"
       - "src/experiment_seed.rs"
       - "src/paired_inference.rs"
+      - "Cargo.toml"
       - "src/lib.rs"
       - "examples/jphi_convergence.rs"
       - "examples/gradient_replacement.rs"
