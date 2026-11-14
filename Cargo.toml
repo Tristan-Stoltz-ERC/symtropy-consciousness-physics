@@ -53,3 +53,8 @@ path = "examples/event_rng_reference_corpus.rs"
 [[example]]
 name = "event_rng_crn_crossfit"
 path = "examples/event_rng_crn_crossfit.rs"
+
+# Event-family-specific cross-fitted CRN coupling portfolio benchmark.
+[[example]]
+name = "event_rng_crn_event_family_portfolio"
+path = "examples/event_rng_crn_event_family_portfolio.rs"
