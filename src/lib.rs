@@ -27,6 +27,7 @@ pub mod event_rng;
 pub mod event_alignment;
 pub mod event_identity;
 pub mod event_lineage;
+pub mod event_lineage_receipt;
 pub mod fep_gradient;
 pub mod harmony_field;
 pub mod prey;
