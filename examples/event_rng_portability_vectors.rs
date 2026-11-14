@@ -1,5 +1,4 @@
 #![forbid(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Emits fixed portability vectors for native x86-64 and AArch64 comparison.
