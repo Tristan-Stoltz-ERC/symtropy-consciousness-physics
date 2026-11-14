@@ -1,7 +1,7 @@
 {
   "schema": "luminous.cargo-artifact-passport.v0.1",
   "status": "content_integrity_and_provenance_receipt",
-  "artifact_discovery": "cargo_json_compiler_artifact_messages_only",
+  "artifact_discovery": "record_only_files_reported_by_compiler-artifact_messages_under_explicit_target_or_build_roots",
   "private_build_layout_inspection": false,
   "source_identity": [
     "git_commit",
@@ -19,7 +19,8 @@
     "package_id",
     "target",
     "profile",
-    "relative_path_under_target_dir",
+    "cargo_reported_root_target_or_build",
+    "relative_path_under_reported_root",
     "sha256",
     "size_bytes"
   ],
