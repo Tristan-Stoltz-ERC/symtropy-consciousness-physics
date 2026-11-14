@@ -6,6 +6,7 @@ on:
       - "src/event_rng.rs"
       - "src/event_alignment.rs"
       - "src/event_identity.rs"
+      - "src/event_lineage.rs"
       - "src/lib.rs"
       - "Cargo.toml"
       - "examples/event_rng_crn_variance.rs"
@@ -19,6 +20,7 @@ on:
       - "docs/research/EVENT_IDENTITY_AND_LINEAGE_POLICY_V0_1.md"
       - "docs/research/EVENT_KEYED_RNG_SOTA_QUALIFICATION_V0_1.md"
       - "docs/research/EVENT_IDENTITY_CLAIM_AUDIT_V0_1.md"
+      - "docs/research/EVENT_DYNAMIC_ENTITY_LINEAGE_V0_1.md"
       - "docs/research/EVENT_RNG_THROUGHPUT_BENCHMARK_V0_1.md"
       - "docs/research/EVENT_RNG_RANDOM123_REFERENCE_PARITY_V0_1.md"
       - "benchmarks/event-rng/implementation-contract-v0.1.json"
@@ -26,6 +28,7 @@ on:
       - "benchmarks/event-rng/event-identity-lineage-contract-v0.1.json"
       - "benchmarks/event-rng/sota-qualification-contract-v0.1.json"
       - "benchmarks/event-rng/event-identity-claim-contract-v0.1.json"
+      - "benchmarks/event-rng/dynamic-entity-lineage-contract-v0.1.json"
       - "benchmarks/event-rng/throughput-contract-v0.1.json"
       - "benchmarks/event-rng/reference-parity-contract-v0.1.json"
       - ".github/workflows/event-keyed-rng-qualification.yml"
@@ -58,6 +61,8 @@ jobs:
             benchmarks/event-rng/sota-qualification-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.event-identity-claim-audit.v0.1"' \
             benchmarks/event-rng/event-identity-claim-contract-v0.1.json
+          jq -e '.schema == "luminous.symtropy.dynamic-entity-lineage.v0.1"' \
+            benchmarks/event-rng/dynamic-entity-lineage-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.event-rng-throughput.v0.1"' \
             benchmarks/event-rng/throughput-contract-v0.1.json
           grep -F 'event_address_cached_uniform_stream' examples/event_rng_throughput.rs
@@ -96,11 +101,15 @@ jobs:
       - name: Format RNG module and CRN benchmark
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
-        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
+        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs examples/event_rng_crn_variance.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
       - name: Run reference vectors and event-address adversarial tests
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
         run: cargo +"$RUST_TOOLCHAIN" test --locked --lib event_rng::tests
+      - name: Run dynamic entity lineage and collision registry tests
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" test --locked --lib event_lineage::tests
       - name: Run semantic event identity claim audit tests
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
