@@ -13,6 +13,7 @@ on:
       - "Cargo.toml"
       - "examples/event_rng_crn_variance.rs"
       - "examples/event_rng_crn_crossfit.rs"
+      - "examples/event_rng_crn_event_family_portfolio.rs"
       - "examples/event_rng_throughput.rs"
       - "examples/event_rng_reference_corpus.rs"
       - "examples/phi_ablation.rs"
@@ -28,6 +29,7 @@ on:
       - "docs/research/EVENT_KEYED_RNG_IMPLEMENTATION_V0_1.md"
       - "docs/research/EVENT_RNG_CRN_VARIANCE_BENCHMARK_V0_1.md"
       - "docs/research/EVENT_RNG_CROSS_FITTED_CRN_COUPLING_V0_1.md"
+      - "docs/research/CRN_EVENT_FAMILY_COUPLING_PORTFOLIO_V0_1.md"
       - "docs/research/EVENT_IDENTITY_AND_LINEAGE_POLICY_V0_1.md"
       - "docs/research/EVENT_KEYED_RNG_SOTA_QUALIFICATION_V0_1.md"
       - "docs/research/EVENT_IDENTITY_CLAIM_AUDIT_V0_1.md"
@@ -38,6 +40,7 @@ on:
       - "benchmarks/event-rng/implementation-contract-v0.1.json"
       - "benchmarks/event-rng/crn-variance-contract-v0.1.json"
       - "benchmarks/event-rng/crn-crossfit-coupling-contract-v0.1.json"
+      - "benchmarks/event-rng/crn-event-family-portfolio-contract-v0.1.json"
       - "benchmarks/event-rng/event-identity-lineage-contract-v0.1.json"
       - "benchmarks/event-rng/sota-qualification-contract-v0.1.json"
       - "benchmarks/event-rng/event-identity-claim-contract-v0.1.json"
@@ -71,6 +74,10 @@ jobs:
             benchmarks/event-rng/crn-variance-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.crn-crossfit-coupling.v0.1"' \
             benchmarks/event-rng/crn-crossfit-coupling-contract-v0.1.json
+          jq -e '.schema == "luminous.symtropy.crn-event-family-portfolio.v0.1"' \
+            benchmarks/event-rng/crn-event-family-portfolio-contract-v0.1.json
+          grep -F 'PER_EVENT_FAMILY_COVARIANCE_SIGN' examples/event_rng_crn_event_family_portfolio.rs
+          grep -F 'training_covariance_u' examples/event_rng_crn_event_family_portfolio.rs
           grep -F 'holdout_used_for_selection' benchmarks/event-rng/crn-crossfit-coupling-contract-v0.1.json
           grep -F 'selected_policy' examples/event_rng_crn_crossfit.rs
           jq -e '.schema == "luminous.symtropy.event-identity-lineage-policy.v0.1"' \
@@ -134,7 +141,7 @@ jobs:
       - name: Format RNG module and CRN benchmark
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
-        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs src/paired_inference.rs examples/event_rng_crn_variance.rs examples/event_rng_crn_crossfit.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
+        run: rustup run "$RUST_TOOLCHAIN" rustfmt --edition 2021 --check src/event_rng.rs src/event_alignment.rs src/event_identity.rs src/event_lineage.rs src/event_lineage_receipt.rs src/paired_inference.rs examples/event_rng_crn_variance.rs examples/event_rng_crn_crossfit.rs examples/event_rng_crn_event_family_portfolio.rs examples/event_rng_throughput.rs examples/event_rng_reference_corpus.rs
       - name: Test seed-keyed paired inference primitives
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
@@ -188,6 +195,41 @@ jobs:
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
         run: cargo +"$RUST_TOOLCHAIN" run --locked --example event_rng_crn_variance
+      - name: Test per-event-family CRN portfolio primitives
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo +"$RUST_TOOLCHAIN" test --locked --example event_rng_crn_event_family_portfolio
+      - name: Run per-event-family CRN portfolio on disjoint holdout seeds
+        env:
+          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup run "$RUST_TOOLCHAIN" cargo run --locked --example event_rng_crn_event_family_portfolio \
+            > "$RUNNER_TEMP/crn-family-portfolio.log"
+          sed -n 's/^FAMILY_PORTFOLIO_JSON=//p' \
+            "$RUNNER_TEMP/crn-family-portfolio.log" \
+            > "$RUNNER_TEMP/crn-family-portfolio.jsonl"
+          test "$(wc -l < "$RUNNER_TEMP/crn-family-portfolio.jsonl")" -eq 2
+          jq -se '
+            length == 2 and
+            all(.[]; 
+              .schema == "luminous.symtropy.crn-event-family-portfolio.v0.1" and
+              .train_replicates == 256 and
+              .holdout_replicates == 256 and
+              .subjects_per_replicate == 2048 and
+              .bootstrap_replicates == 2000 and
+              .pass == true and
+              .variance_ratio_per_family_to_independent < (.variance_ratio_global_to_independent * 0.90)
+            ) and
+            (map(select(.beta_u == 0.5))[0].family_u_policy == "SHARED") and
+            (map(select(.beta_u == 0.5))[0].family_v_policy == "INDEPENDENT") and
+            (map(select(.beta_u == -1.5))[0].family_u_policy == "INDEPENDENT") and
+            (map(select(.beta_u == -1.5))[0].family_v_policy == "SHARED") and
+            all(.[]; .global_policy == "SHARED_BOTH")
+          ' "$RUNNER_TEMP/crn-family-portfolio.jsonl"
+          sha256sum "$RUNNER_TEMP/crn-family-portfolio.jsonl"
+          cat "$RUNNER_TEMP/crn-family-portfolio.jsonl"
       - name: Run cross-fitted CRN coupling selector
         env:
           RUST_TOOLCHAIN: ${{ matrix.toolchain }}
