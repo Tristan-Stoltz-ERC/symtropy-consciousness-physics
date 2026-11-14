@@ -30,6 +30,7 @@ use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants}
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
 use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::experiment_seed::ExperimentSeedSchedule;
 
 const AGENTS: usize = 20;
 const TICKS: usize = 8_000;
@@ -283,9 +284,17 @@ fn run_experiment(ctrl: Controller, seed: u64) -> ReplaceResult {
 }
 
 fn main() {
+    let seed_schedule = match ExperimentSeedSchedule::from_env(SEEDS) {
+        Ok(schedule) => schedule,
+        Err(error) => {
+            eprintln!("Invalid experiment seed schedule: {error}");
+            std::process::exit(2);
+        }
+    };
+    eprintln!("Seed schedule: {}", seed_schedule.describe());
     eprintln!("=== Gradient Replacement Study ===");
     eprintln!("Is cooperation controller-invariant?");
-    eprintln!("{AGENTS} agents, {TICKS} ticks, {SEEDS} seeds, 6 controllers");
+    eprintln!("{AGENTS} agents, {TICKS} ticks, {} seeds, 6 controllers", seed_schedule.len());
 
     println!("controller,seed,alive,energy,clustering,cooperation");
 
@@ -301,8 +310,7 @@ fn main() {
 
     for &(ctrl, name) in &controllers {
         let mut results = Vec::new();
-        for s in 0..SEEDS {
-            let seed = 42 + s as u64 * 997;
+        for &seed in seed_schedule.seeds() {
             eprintln!("  {name} seed={seed}...");
             let r = run_experiment(ctrl, seed);
             println!("{},{seed},{:.1},{:.1},{:.2},{:.0}", r.controller, r.alive, r.energy, r.clustering, r.cooperation);
