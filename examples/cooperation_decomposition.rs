@@ -29,6 +29,7 @@ use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants}
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
 use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::experiment_seed::ExperimentSeedSchedule;
 
 const AGENTS: usize = 20;
 const TICKS: usize = 8_000;
@@ -228,9 +229,17 @@ fn run_experiment(ctrl: Controller, regen: RegenMode, seed: u64) -> DecompResult
 }
 
 fn main() {
+    let seed_schedule = match ExperimentSeedSchedule::from_env(SEEDS) {
+        Ok(schedule) => schedule,
+        Err(error) => {
+            eprintln!("Invalid experiment seed schedule: {error}");
+            std::process::exit(2);
+        }
+    };
+    eprintln!("Seed schedule: {}", seed_schedule.describe());
     eprintln!("=== Cooperation Decomposition ===");
     eprintln!("Is passive cooperation load-bearing, or epiphenomenal?");
-    eprintln!("{AGENTS} agents, {TICKS} ticks, {SEEDS} seeds, 6 conditions");
+    eprintln!("{AGENTS} agents, {TICKS} ticks, {} seeds, 6 conditions", seed_schedule.len());
 
     println!("condition,seed,alive,energy,cooperation,well_energy,resonance_energy");
 
@@ -246,8 +255,7 @@ fn main() {
 
     for &(ctrl, regen, name) in &conditions {
         let mut results = Vec::new();
-        for s in 0..SEEDS {
-            let seed = 42 + s as u64 * 997;
+        for &seed in seed_schedule.seeds() {
             eprintln!("  {name} seed={seed}...");
             let r = run_experiment(ctrl, regen, seed);
             println!("{},{seed},{:.1},{:.1},{:.0},{:.0},{:.0}",
