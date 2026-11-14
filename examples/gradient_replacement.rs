@@ -291,7 +291,9 @@ fn main() {
             std::process::exit(2);
         }
     };
-    eprintln!("Seed schedule: {}", seed_schedule.describe());
+    if seed_schedule.is_overridden() {
+        eprintln!("Seed schedule: {}", seed_schedule.describe());
+    }
     eprintln!("=== Gradient Replacement Study ===");
     eprintln!("Is cooperation controller-invariant?");
     eprintln!("{AGENTS} agents, {TICKS} ticks, {} seeds, 6 controllers", seed_schedule.len());
