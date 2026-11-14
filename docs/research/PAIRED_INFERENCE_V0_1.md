@@ -61,10 +61,15 @@ Example:
       --control WELL+NO_REGEN \
       --treatment WELL+REGEN \
       --metric alive \
+      --input-sha256 "$(sha256sum run.csv | cut -d ' ' -f 1)" \
       --bootstrap-replicates 20000 \
       --bootstrap-seed 0x5041495245440001 \
       --equivalence-margin 1.0 \
       --margin-rationale "pre-registered domain-specific survival margin"
+
+The optional input-sha256 field should be populated from sha256sum and kept
+with the original CSV. The analyzer validates its 64-character hexadecimal
+shape but does not recompute it; the evidence wrapper must verify the digest.
 
 The example-output CSV is deliberately parsed as unquoted comma-separated
 values, matching the current producer. It rejects quoted cells rather than
