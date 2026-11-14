@@ -147,7 +147,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         .collect::<Vec<_>>()
         .join(",");
     let path_json = json_string(&input_path.to_string_lossy());
-    let input_sha256_json = input_sha256.as_deref().map(json_string).unwrap_or_else(|| "null".to_string());
+    let input_sha256_json = input_sha256
+        .as_deref()
+        .map(json_string)
+        .unwrap_or_else(|| "null".to_string());
     println!(
         concat!(
             "{{\n",
