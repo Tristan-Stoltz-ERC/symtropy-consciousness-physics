@@ -47,6 +47,8 @@ PASSPORT="$OUTPUT/passport.json"
 LOCK_BEFORE="$(sha256sum "$LOCK_FILE" | awk '{print $1}')"
 rustup run "$TOOLCHAIN" rustc -Vv > "$OUTPUT/rustc-version.txt"
 rustup run "$TOOLCHAIN" cargo -Vv > "$OUTPUT/cargo-version.txt"
+[[ "$(head -n 1 "$OUTPUT/rustc-version.txt")" == "rustc $TOOLCHAIN "* ]]
+[[ "$(head -n 1 "$OUTPUT/cargo-version.txt")" == "cargo $TOOLCHAIN "* ]]
 HOST="$(awk -F': ' '$1 == "host" {print $2; exit}' "$OUTPUT/rustc-version.txt")"
 [[ -n "$HOST" ]] || { echo "rustc host triple missing" >&2; exit 1; }
 
@@ -57,16 +59,18 @@ rustup run "$TOOLCHAIN" cargo metadata \
 # Warm the exact locked graph online, then make measured artifact production offline.
 rustup run "$TOOLCHAIN" cargo fetch --manifest-path "$MANIFEST_ABS" --locked
 env \
-  -u RUSTC_WRAPPER \
-  -u RUSTC_WORKSPACE_WRAPPER \
+  -u RUSTC \
+  -u CARGO_BUILD_RUSTC \
+  -u CARGO_BUILD_RUSTC_WRAPPER \
+  -u CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER \
+  RUSTC_WRAPPER="" \
+  RUSTC_WORKSPACE_WRAPPER="" \
   CARGO_TARGET_DIR="$TARGET_DIR" \
   CARGO_BUILD_BUILD_DIR="$BUILD_DIR" \
   CARGO_INCREMENTAL=0 \
   rustup run "$TOOLCHAIN" cargo build \
     --manifest-path "$MANIFEST_ABS" \
     --locked --all-targets --offline --target "$HOST" \
-    --config 'build.rustc-wrapper=""' \
-    --config 'build.rustc-workspace-wrapper=""' \
     --message-format=json-render-diagnostics \
     > "$RAW" 2> "$DIAGNOSTICS"
 
@@ -127,11 +131,10 @@ if [[ -f "$ROOT/.cargo/config.toml" ]]; then
 elif [[ -f "$ROOT/.cargo/config" ]]; then
   CARGO_CONFIG_SHA="$(sha256_file "$ROOT/.cargo/config")"
 fi
+CARGO_HOME_EFFECTIVE="${CARGO_HOME:-$HOME/.cargo}"
 CARGO_HOME_CONFIG_SHA=""
-if [[ -n "${CARGO_HOME-}" ]]; then
-  if [[ -f "$CARGO_HOME/config.toml" ]]; then CARGO_HOME_CONFIG_SHA="$(sha256_file "$CARGO_HOME/config.toml")"
-  elif [[ -f "$CARGO_HOME/config" ]]; then CARGO_HOME_CONFIG_SHA="$(sha256_file "$CARGO_HOME/config")"
-  fi
+if [[ -f "$CARGO_HOME_EFFECTIVE/config.toml" ]]; then CARGO_HOME_CONFIG_SHA="$(sha256_file "$CARGO_HOME_EFFECTIVE/config.toml")"
+elif [[ -f "$CARGO_HOME_EFFECTIVE/config" ]]; then CARGO_HOME_CONFIG_SHA="$(sha256_file "$CARGO_HOME_EFFECTIVE/config")"
 fi
 
 jq -n -S \
@@ -159,6 +162,7 @@ jq -n -S \
   --arg artifacts_sha "$(sha256_file "$ARTIFACTS")" \
   --arg rustflags "${RUSTFLAGS-}" \
   --arg encoded_rustflags "${CARGO_ENCODED_RUSTFLAGS-}" \
+  --arg cargo_build_rustflags "${CARGO_BUILD_RUSTFLAGS-}" \
   --slurpfile compiler_artifacts "$ARTIFACTS" \
   '{
     schema:$schema,
@@ -188,6 +192,7 @@ jq -n -S \
       incremental:false,
       rustflags:$rustflags,
       cargo_encoded_rustflags:$encoded_rustflags,
+      cargo_build_rustflags:$cargo_build_rustflags,
       rustc_wrapper:"disabled_by_cli_override",
       rustc_workspace_wrapper:"disabled_by_cli_override",
       target_directory:"target",
