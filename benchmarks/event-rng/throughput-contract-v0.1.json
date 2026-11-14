@@ -6,7 +6,8 @@
     "philox4x64_core_block",
     "event_address_construct_plus_word",
     "event_address_construct_plus_block",
-    "event_address_prebuilt_scalar_word"
+    "event_address_prebuilt_scalar_word",
+    "event_address_cached_scalar_stream"
   ],
   "rounds": 5,
   "workload_order": "rotated_by_round",
@@ -19,7 +20,8 @@
   ],
   "correctness_controls": [
     "checksums_stable_across_rounds",
-    "black_box_outputs"
+    "black_box_outputs",
+    "cached_stream_matches_event_address_random_access_word_tests"
   ],
   "nonclaims": [
     "not_a_same_host_Random123_C_comparison",
