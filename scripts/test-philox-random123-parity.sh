@@ -32,7 +32,8 @@ g++ -std=c++11 -O2 \
   "$ROOT/tests/reference/philox4x64_random123.cpp" \
   -o "$WORK/philox-reference"
 
-rustup run "$TOOLCHAIN" cargo run --locked \
+rustup run "$TOOLCHAIN" cargo fetch --locked
+rustup run "$TOOLCHAIN" cargo run --locked --offline \
   --example event_rng_reference_corpus -- "$CORPUS_COUNT" \
   > "$WORK/reference-corpus.txt"
 
