@@ -1,0 +1,55 @@
+{
+  "schema": "luminous.symtropy.scalar-control-event-rng-ablation.v0.1",
+  "status": "additive_experiment_correction_and_event_keyed_control",
+  "design": {
+    "agents": 12,
+    "ticks": 3000,
+    "matched_replicates_per_condition": 30,
+    "seed_schedule": "42 + 997 * logical_seed_index",
+    "initial_state_rng": "historical_lcg_unchanged",
+    "same_initial_state_by_seed_across_conditions": true
+  },
+  "controls": {
+    "entropy_proxy": "normalized_binary_entropy_of_energy_fraction",
+    "random_legacy": {
+      "algorithm": "historical_lcg_like_formula",
+      "address": ["tick", "agent_index"],
+      "replicate_seed_included": false
+    },
+    "random_event": {
+      "algorithm": "philox4x64-10",
+      "key": ["replicate_seed", "experiment_namespace"],
+      "counter": ["stable_agent_subject_id", "simulation_tick", "event_kind", "draw_purpose", "occurrence_ordinal"],
+      "event_kind": "PHI_ABLATION_CONTROL",
+      "draw_purpose": "RANDOM_METRIC_SAMPLE",
+      "occurrence_ordinal": 0,
+      "draw_index": 0,
+      "uniform_mapping": "top_52_bit_midpoint_open_interval"
+    },
+    "constant": "0.5",
+    "zero": "0.0"
+  },
+  "tests": [
+    "same_address_repeatability",
+    "replicate_seed_separation",
+    "agent_subject_separation",
+    "tick_separation",
+    "strict_open_interval",
+    "legacy_vs_event_control_separation"
+  ],
+  "statistics": {
+    "current_summary": "per_condition_mean_and_normal_approximation_95_percent_interval",
+    "paired_effect_interval": false,
+    "paired_randomization_test": false,
+    "equivalence_bounds": false,
+    "multiplicity_adjustment": false,
+    "confirmatory_claims_allowed": false
+  },
+  "nonclaims": [
+    "no_equation_level_phi_measurement",
+    "entropy_is_a_proxy_not_full_state_entropy",
+    "no_TestU01_or_PractRand_pass",
+    "no_physical_or_social_causal_validity_claim",
+    "no_historical_results_relabelled"
+  ]
+}
