@@ -200,6 +200,7 @@ jq -n -S \
       layout_policy:"cargo_json_messages_only"
     },
     inputs:{
+      cargo_metadata_sha256:$metadata_sha,
       cargo_messages_sha256:$messages_sha,
       diagnostics_sha256:$diagnostics_sha,
       rustc_version_file_sha256:$rustc_file_sha,
