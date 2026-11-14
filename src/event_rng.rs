@@ -20,10 +20,16 @@ pub struct EventKind(u16);
 
 impl EventKind {
     pub const fn new(tag: u16) -> Option<Self> {
-        if tag == 0 { None } else { Some(Self(tag)) }
+        if tag == 0 {
+            None
+        } else {
+            Some(Self(tag))
+        }
     }
 
-    pub const fn tag(self) -> u16 { self.0 }
+    pub const fn tag(self) -> u16 {
+        self.0
+    }
 }
 
 /// A stable u16 tag from the versioned draw-purpose registry. Zero is reserved.
@@ -32,10 +38,16 @@ pub struct DrawPurpose(u16);
 
 impl DrawPurpose {
     pub const fn new(tag: u16) -> Option<Self> {
-        if tag == 0 { None } else { Some(Self(tag)) }
+        if tag == 0 {
+            None
+        } else {
+            Some(Self(tag))
+        }
     }
 
-    pub const fn tag(self) -> u16 { self.0 }
+    pub const fn tag(self) -> u16 {
+        self.0
+    }
 }
 
 /// Initial v1 registry entries. Additions must be append-only and reviewed.
@@ -66,10 +78,14 @@ pub enum SubjectIdError {
 }
 
 impl SubjectId {
-    pub const fn global_environment() -> Self { Self(0) }
+    pub const fn global_environment() -> Self {
+        Self(0)
+    }
 
     pub fn agent(agent_id: u32) -> Result<Self, SubjectIdError> {
-        if agent_id == 0 { return Err(SubjectIdError::ZeroAgentId); }
+        if agent_id == 0 {
+            return Err(SubjectIdError::ZeroAgentId);
+        }
         Ok(Self(agent_id as u64))
     }
 
@@ -85,7 +101,9 @@ impl SubjectId {
         Ok(Self(((low as u64) << 32) | high as u64))
     }
 
-    pub const fn raw(self) -> u64 { self.0 }
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
 }
 
 /// Complete immutable address for one random event.
@@ -361,11 +379,41 @@ mod tests {
         );
         let reference = base.word(0);
         let changed = [
-            address(SubjectId::agent(6).unwrap(), 10, registry::RANDOM_WALK, registry::RANDOM_WALK_ANGLE, 0),
-            address(SubjectId::agent(5).unwrap(), 11, registry::RANDOM_WALK, registry::RANDOM_WALK_ANGLE, 0),
-            address(SubjectId::agent(5).unwrap(), 10, registry::ENVIRONMENT, registry::RANDOM_WALK_ANGLE, 0),
-            address(SubjectId::agent(5).unwrap(), 10, registry::RANDOM_WALK, registry::ENVIRONMENTAL_NOISE, 0),
-            address(SubjectId::agent(5).unwrap(), 10, registry::RANDOM_WALK, registry::RANDOM_WALK_ANGLE, 1),
+            address(
+                SubjectId::agent(6).unwrap(),
+                10,
+                registry::RANDOM_WALK,
+                registry::RANDOM_WALK_ANGLE,
+                0,
+            ),
+            address(
+                SubjectId::agent(5).unwrap(),
+                11,
+                registry::RANDOM_WALK,
+                registry::RANDOM_WALK_ANGLE,
+                0,
+            ),
+            address(
+                SubjectId::agent(5).unwrap(),
+                10,
+                registry::ENVIRONMENT,
+                registry::RANDOM_WALK_ANGLE,
+                0,
+            ),
+            address(
+                SubjectId::agent(5).unwrap(),
+                10,
+                registry::RANDOM_WALK,
+                registry::ENVIRONMENTAL_NOISE,
+                0,
+            ),
+            address(
+                SubjectId::agent(5).unwrap(),
+                10,
+                registry::RANDOM_WALK,
+                registry::RANDOM_WALK_ANGLE,
+                1,
+            ),
         ];
         assert!(changed.iter().all(|item| item.word(0) != reference));
     }
@@ -418,7 +466,10 @@ mod tests {
                 .iter()
                 .map(|item| scope.spawn(move || item.word(0)))
                 .collect();
-            handles.into_iter().map(|handle| handle.join().unwrap()).collect::<Vec<_>>()
+            handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .collect::<Vec<_>>()
         });
         assert_eq!(serial, parallel);
     }
