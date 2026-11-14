@@ -19,7 +19,9 @@
     "static_subject_reservation_required": true,
     "shared_across_matched_scenarios": true,
     "idempotent_resolution": true,
-    "collision_response": "fail_closed"
+    "collision_response": "fail_closed",
+    "complete_birth_key_receipt_export": true,
+    "receipt_order": "ascending_subject_id"
   },
   "tests": [
     "parent_order_canonicalization",
@@ -31,7 +33,8 @@
     "dynamic_birth_collision_rejected",
     "late_static_reservation_rejected",
     "duplicate_parent_rejected",
-    "zero_namespace_rejected"
+    "zero_namespace_rejected",
+    "assignment_receipts_complete_and_insertion_order_independent"
   ],
   "not_implemented": [
     "automatic_model_birth_site_instrumentation",
