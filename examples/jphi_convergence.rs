@@ -294,7 +294,9 @@ fn main() {
             std::process::exit(2);
         }
     };
-    eprintln!("Seed schedule: {}", seed_schedule.describe());
+    if seed_schedule.is_overridden() {
+        eprintln!("Seed schedule: {}", seed_schedule.describe());
+    }
     eprintln!("=== J/Phi Convergence Experiment ===");
     eprintln!("Agents: {AGENTS}, MaxTicks: {MAX_TICKS}, Seeds: {}", seed_schedule.len());
     eprintln!("Window: {CONVERGENCE_WINDOW}, Threshold: {CONVERGENCE_THRESHOLD}");
