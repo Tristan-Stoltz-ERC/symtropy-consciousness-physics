@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! PHI ABLATION: Does the consciousness metric matter?
 //!
-//! Tests whether clustering depends on the SPECIFIC integration measure (Φ)
-//! or whether ANY scalar produces the same effect.
+//! Tests whether clustering depends on the supplied scalar input or whether
+//! entropy, random, constant, and zero controls produce similar outcomes.
 //!
 //! 5 metric conditions × 30 seeds × 5000 ticks = 150 runs
 //!
@@ -252,9 +252,9 @@ fn main() {
     }
 
     println!("\n═══════════════════════════════════════════════════════");
-    println!("If PHI produces significantly different clustering than");
-    println!("RANDOM/CONSTANT/ZERO, then the integration metric matters.");
-    println!("If all metrics produce similar clustering, any scalar works.");
+    println!("No equation-level Phi measurement is included in this harness.");
+    println!("Compare RANDOM_LEGACY with RANDOM_EVENT to audit seed-keyed noise.");
+    println!("All conditions share the same seed-indexed initial-state schedule.");
     println!("═══════════════════════════════════════════════════════");
 }
 
@@ -265,7 +265,7 @@ mod event_random_control_tests {
     use super::*;
 
     #[test]
-    fn legacy_random_control_is_repeatable_but_has_no_replicate_key() {
+    fn legacy_control_depends_only_on_tick_and_agent_identity() {
         assert_eq!(legacy_random_control(17, 3), legacy_random_control(17, 3));
     }
 
