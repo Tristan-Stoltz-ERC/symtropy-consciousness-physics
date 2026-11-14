@@ -29,12 +29,23 @@ pub enum LineageReceiptError {
     BadRecordCount,
     BadColumns,
     TooManyRows,
-    InvalidRow { line: usize, reason: String },
+    InvalidRow {
+        line: usize,
+        reason: String,
+    },
     DuplicateBirthKey,
-    DuplicateSubjectId { subject_id: u64 },
+    DuplicateSubjectId {
+        subject_id: u64,
+    },
     NonCanonicalEncoding,
-    DerivedSubjectMismatch { recorded: SubjectId, derived: SubjectId },
-    BirthSubjectMismatchAcrossScenarios { reference: SubjectId, counterfactual: SubjectId },
+    DerivedSubjectMismatch {
+        recorded: SubjectId,
+        derived: SubjectId,
+    },
+    BirthSubjectMismatchAcrossScenarios {
+        reference: SubjectId,
+        counterfactual: SubjectId,
+    },
     Identity(LineageIdentityError),
 }
 
@@ -46,7 +57,10 @@ impl From<LineageIdentityError> for LineageReceiptError {
 
 impl From<BirthKeyError> for LineageReceiptError {
     fn from(value: BirthKeyError) -> Self {
-        Self::InvalidRow { line: 0, reason: format!("{value:?}") }
+        Self::InvalidRow {
+            line: 0,
+            reason: format!("{value:?}"),
+        }
     }
 }
 
@@ -198,8 +212,7 @@ impl LineageReceipt {
                 }
             })?;
 
-            let offspring_slot =
-                parse_decimal_u32(fields[3], line_number, "offspring_slot")?;
+            let offspring_slot = parse_decimal_u32(fields[3], line_number, "offspring_slot")?;
             let subject_raw = parse_decimal_u64(fields[4], line_number, "subject_id")?;
             let subject_id = SubjectId::from_nonzero_raw(subject_raw).ok_or_else(|| {
                 LineageReceiptError::InvalidRow {
@@ -271,15 +284,13 @@ impl LineageReceipt {
     }
 }
 
-fn parse_decimal_u64(
-    value: &str,
-    line: usize,
-    field: &str,
-) -> Result<u64, LineageReceiptError> {
-    let parsed = value.parse::<u64>().map_err(|_| LineageReceiptError::InvalidRow {
-        line,
-        reason: format!("{field} must be an unsigned decimal integer"),
-    })?;
+fn parse_decimal_u64(value: &str, line: usize, field: &str) -> Result<u64, LineageReceiptError> {
+    let parsed = value
+        .parse::<u64>()
+        .map_err(|_| LineageReceiptError::InvalidRow {
+            line,
+            reason: format!("{field} must be an unsigned decimal integer"),
+        })?;
     if parsed.to_string() != value {
         return Err(LineageReceiptError::InvalidRow {
             line,
@@ -289,15 +300,13 @@ fn parse_decimal_u64(
     Ok(parsed)
 }
 
-fn parse_decimal_u32(
-    value: &str,
-    line: usize,
-    field: &str,
-) -> Result<u32, LineageReceiptError> {
-    let parsed = value.parse::<u32>().map_err(|_| LineageReceiptError::InvalidRow {
-        line,
-        reason: format!("{field} must be an unsigned decimal integer"),
-    })?;
+fn parse_decimal_u32(value: &str, line: usize, field: &str) -> Result<u32, LineageReceiptError> {
+    let parsed = value
+        .parse::<u32>()
+        .map_err(|_| LineageReceiptError::InvalidRow {
+            line,
+            reason: format!("{field} must be an unsigned decimal integer"),
+        })?;
     if parsed.to_string() != value {
         return Err(LineageReceiptError::InvalidRow {
             line,
@@ -332,7 +341,11 @@ pub fn reconcile_lineage_receipts(
     for subject in static_subjects {
         union_registry.reserve_static_subject(*subject)?;
     }
-    for assignment in reference.assignments.iter().chain(&counterfactual.assignments) {
+    for assignment in reference
+        .assignments
+        .iter()
+        .chain(&counterfactual.assignments)
+    {
         let resolved = union_registry.resolve(assignment.birth_key.clone())?;
         if resolved != assignment.subject_id {
             return Err(LineageReceiptError::DerivedSubjectMismatch {
@@ -450,10 +463,20 @@ mod tests {
     #[test]
     fn imported_subject_ids_are_rederived_not_trusted() {
         let value = receipt(vec![birth(7, &[11, 3], 0xabc, 2)]);
-        let mut lines = value.encode().lines().map(str::to_string).collect::<Vec<_>>();
+        let mut lines = value
+            .encode()
+            .lines()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
         let row_index = 3;
-        let recorded = lines[row_index].rsplit(',').next().unwrap().parse::<u64>().unwrap();
-        lines[row_index] = format!("{},{}", 
+        let recorded = lines[row_index]
+            .rsplit(',')
+            .next()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap();
+        lines[row_index] = format!(
+            "{},{}",
             lines[row_index].rsplitn(2, ',').nth(1).unwrap(),
             recorded.wrapping_add(1)
         );
