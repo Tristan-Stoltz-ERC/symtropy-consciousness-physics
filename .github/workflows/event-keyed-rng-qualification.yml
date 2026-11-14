@@ -219,6 +219,7 @@ jobs:
               .holdout_replicates == 256 and
               .subjects_per_replicate == 2048 and
               .bootstrap_replicates == 2000 and
+              (.portfolio_to_global_variance_ratio_ci | length) == 2 and
               .pass == true and
               .variance_ratio_per_family_to_independent < (.variance_ratio_global_to_independent * 0.90)
             ) and
