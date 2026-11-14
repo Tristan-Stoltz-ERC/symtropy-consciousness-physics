@@ -92,6 +92,7 @@ struct Case {
     variances: [f64; 4],
     ratios: [f64; 3],
     ratio_intervals: [Interval; 3],
+    portfolio_to_global_interval: Interval,
     theoretical_shared_ratio: f64,
     theoretical_portfolio_ratio: f64,
 }
@@ -326,6 +327,11 @@ fn run_case(beta_u: f64, beta_v: f64) -> Case {
             bootstrap_ratio_interval(&global, &all_independent, seed + 1),
             bootstrap_ratio_interval(&per_family, &all_independent, seed + 2),
         ],
+        portfolio_to_global_interval: bootstrap_ratio_interval(
+            &per_family,
+            &global,
+            seed + 3,
+        ),
         theoretical_shared_ratio: theoretical_shared_variance(beta_u, beta_v)
             / theoretical_independent_variance(beta_u, beta_v),
         theoretical_portfolio_ratio: theoretical_portfolio_variance(beta_u, beta_v)
@@ -353,7 +359,7 @@ fn passes(case: Case) -> bool {
 fn print_case(case: Case) -> bool {
     let passed = passes(case);
     println!(
-        "FAMILY_PORTFOLIO_JSON={{\"schema\":\"luminous.symtropy.crn-event-family-portfolio.v0.1\",\"beta_u\":{:.6},\"beta_v\":{:.6},\"train_replicates\":{},\"holdout_replicates\":{},\"subjects_per_replicate\":{},\"known_ate\":{:.9},\"training_covariance_u\":{:.12e},\"training_covariance_v\":{:.12e},\"training_covariance_total\":{:.12e},\"global_policy\":\"{}\",\"family_u_policy\":\"{}\",\"family_v_policy\":\"{}\",\"mean_all_independent\":{:.12e},\"mean_all_shared\":{:.12e},\"mean_global_policy\":{:.12e},\"mean_per_family_policy\":{:.12e},\"variance_ratio_all_shared_to_independent\":{:.9},\"variance_ratio_global_to_independent\":{:.9},\"variance_ratio_per_family_to_independent\":{:.9},\"theoretical_ratio_all_shared\":{:.9},\"theoretical_ratio_per_family\":{:.9},\"ratio_ci_all_shared\":[{:.9},{:.9}],\"ratio_ci_global\":[{:.9},{:.9}],\"ratio_ci_per_family\":[{:.9},{:.9}],\"bootstrap_replicates\":{},\"pass\":{}}}",
+        "FAMILY_PORTFOLIO_JSON={{\"schema\":\"luminous.symtropy.crn-event-family-portfolio.v0.1\",\"beta_u\":{:.6},\"beta_v\":{:.6},\"train_replicates\":{},\"holdout_replicates\":{},\"subjects_per_replicate\":{},\"known_ate\":{:.9},\"training_covariance_u\":{:.12e},\"training_covariance_v\":{:.12e},\"training_covariance_total\":{:.12e},\"global_policy\":\"{}\",\"family_u_policy\":\"{}\",\"family_v_policy\":\"{}\",\"mean_all_independent\":{:.12e},\"mean_all_shared\":{:.12e},\"mean_global_policy\":{:.12e},\"mean_per_family_policy\":{:.12e},\"variance_ratio_all_shared_to_independent\":{:.9},\"variance_ratio_global_to_independent\":{:.9},\"variance_ratio_per_family_to_independent\":{:.9},\"theoretical_ratio_all_shared\":{:.9},\"theoretical_ratio_per_family\":{:.9},\"ratio_ci_all_shared\":[{:.9},{:.9}],\"ratio_ci_global\":[{:.9},{:.9}],\"ratio_ci_per_family\":[{:.9},{:.9}],\"portfolio_to_global_variance_ratio_ci\":[{:.9},{:.9}],\"bootstrap_replicates\":{},\"pass\":{}}}",
         case.beta_u,
         case.beta_v,
         TRAIN_REPLICATES,
@@ -381,6 +387,8 @@ fn print_case(case: Case) -> bool {
         case.ratio_intervals[1].upper,
         case.ratio_intervals[2].lower,
         case.ratio_intervals[2].upper,
+        case.portfolio_to_global_interval.lower,
+        case.portfolio_to_global_interval.upper,
         BOOTSTRAP_DRAWS,
         passed
     );
