@@ -37,7 +37,9 @@ impl fmt::Display for ScenarioSide {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AlignmentError {
-    EmptyScenario { side: ScenarioSide },
+    EmptyScenario {
+        side: ScenarioSide,
+    },
     DuplicateEventDraw {
         side: ScenarioSide,
         draw_index: u64,
@@ -392,8 +394,7 @@ mod tests {
         let average_effect = paired_effect / AGENTS as f64;
         assert!((average_effect - KNOWN_TREATMENT_EFFECT).abs() < 1e-15);
 
-        let alignment =
-            compare_event_outputs(&reference_records, &counterfactual_records).unwrap();
+        let alignment = compare_event_outputs(&reference_records, &counterfactual_records).unwrap();
         assert_eq!(alignment.matched_events, AGENTS as usize);
         assert_eq!(alignment.bit_identical, AGENTS as usize);
         assert_eq!(alignment.mismatched, 0);
