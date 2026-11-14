@@ -43,3 +43,8 @@ path = "examples/event_rng_crn_variance.rs"
 [[example]]
 name = "event_rng_throughput"
 path = "examples/event_rng_throughput.rs"
+
+# Deterministic corpus generator for pinned Random123 Philox parity.
+[[example]]
+name = "event_rng_reference_corpus"
+path = "examples/event_rng_reference_corpus.rs"
