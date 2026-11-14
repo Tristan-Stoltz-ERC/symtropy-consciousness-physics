@@ -76,7 +76,7 @@ jobs:
             benchmarks/event-rng/crn-crossfit-coupling-contract-v0.1.json
           jq -e '.schema == "luminous.symtropy.crn-event-family-portfolio.v0.1"' \
             benchmarks/event-rng/crn-event-family-portfolio-contract-v0.1.json
-          grep -F 'PER_EVENT_FAMILY_COVARIANCE_SIGN' examples/event_rng_crn_event_family_portfolio.rs
+          grep -F 'family_covariance' examples/event_rng_crn_event_family_portfolio.rs
           grep -F 'training_covariance_u' examples/event_rng_crn_event_family_portfolio.rs
           grep -F 'holdout_used_for_selection' benchmarks/event-rng/crn-crossfit-coupling-contract-v0.1.json
           grep -F 'selected_policy' examples/event_rng_crn_crossfit.rs
