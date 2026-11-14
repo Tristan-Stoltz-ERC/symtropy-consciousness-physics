@@ -24,6 +24,7 @@ pub mod dimensional_leakage;
 pub mod energy;
 pub mod experiment_seed;
 pub mod event_rng;
+pub mod event_lineage;
 pub mod event_alignment;
 pub mod fep_gradient;
 pub mod harmony_field;
