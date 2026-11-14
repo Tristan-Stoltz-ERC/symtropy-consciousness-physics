@@ -330,9 +330,7 @@ pub fn audit_event_identity_claims(
     let counterfactual_index = index_claims(counterfactual, ScenarioSide::Counterfactual)?;
 
     for (address, reference_semantic_id) in &reference_index.by_address {
-        if let Some(counterfactual_semantic_id) =
-            counterfactual_index.by_address.get(address)
-        {
+        if let Some(counterfactual_semantic_id) = counterfactual_index.by_address.get(address) {
             if reference_semantic_id != counterfactual_semantic_id {
                 return Err(IdentityAuditError::SemanticAliasAcrossScenarios {
                     address: *address,
@@ -443,11 +441,7 @@ mod tests {
         )
     }
 
-    fn claim(
-        id: u128,
-        event_address: EventAddress,
-        policy: SharingPolicy,
-    ) -> EventIdentityClaim {
+    fn claim(id: u128, event_address: EventAddress, policy: SharingPolicy) -> EventIdentityClaim {
         EventIdentityClaim::new(semantic_id(id), event_address, policy)
     }
 
@@ -569,16 +563,8 @@ mod tests {
     #[test]
     fn same_semantic_cause_with_two_addresses_inside_one_scenario_is_rejected() {
         let claims = [
-            claim(
-                4,
-                address(1, 10, NAMESPACE),
-                SharingPolicy::Conditional,
-            ),
-            claim(
-                4,
-                address(2, 10, NAMESPACE),
-                SharingPolicy::Conditional,
-            ),
+            claim(4, address(1, 10, NAMESPACE), SharingPolicy::Conditional),
+            claim(4, address(2, 10, NAMESPACE), SharingPolicy::Conditional),
         ];
 
         assert!(matches!(
@@ -616,28 +602,12 @@ mod tests {
     #[test]
     fn distinct_and_conditional_unmatched_events_remain_visible() {
         let reference = [
-            claim(
-                11,
-                address(1, 10, NAMESPACE),
-                SharingPolicy::Distinct,
-            ),
-            claim(
-                12,
-                address(2, 10, NAMESPACE),
-                SharingPolicy::Conditional,
-            ),
+            claim(11, address(1, 10, NAMESPACE), SharingPolicy::Distinct),
+            claim(12, address(2, 10, NAMESPACE), SharingPolicy::Conditional),
         ];
         let counterfactual = [
-            claim(
-                13,
-                address(3, 10, NAMESPACE),
-                SharingPolicy::Distinct,
-            ),
-            claim(
-                14,
-                address(4, 10, NAMESPACE),
-                SharingPolicy::Conditional,
-            ),
+            claim(13, address(3, 10, NAMESPACE), SharingPolicy::Distinct),
+            claim(14, address(4, 10, NAMESPACE), SharingPolicy::Conditional),
         ];
 
         let summary = audit_event_identity_claims(&reference, &counterfactual).unwrap();
@@ -652,29 +622,13 @@ mod tests {
         let shared = address(1, 10, NAMESPACE);
         let reference = [
             claim(1, shared, SharingPolicy::MustShare),
-            claim(
-                2,
-                address(2, 10, NAMESPACE),
-                SharingPolicy::Conditional,
-            ),
-            claim(
-                3,
-                address(3, 10, NAMESPACE),
-                SharingPolicy::Distinct,
-            ),
+            claim(2, address(2, 10, NAMESPACE), SharingPolicy::Conditional),
+            claim(3, address(3, 10, NAMESPACE), SharingPolicy::Distinct),
         ];
         let counterfactual = [
             claim(1, shared, SharingPolicy::MustShare),
-            claim(
-                4,
-                address(4, 10, NAMESPACE),
-                SharingPolicy::Conditional,
-            ),
-            claim(
-                5,
-                address(5, 10, NAMESPACE),
-                SharingPolicy::Distinct,
-            ),
+            claim(4, address(4, 10, NAMESPACE), SharingPolicy::Conditional),
+            claim(5, address(5, 10, NAMESPACE), SharingPolicy::Distinct),
         ];
 
         let forward = audit_event_identity_claims(&reference, &counterfactual).unwrap();
