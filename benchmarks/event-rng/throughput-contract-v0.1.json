@@ -1,0 +1,30 @@
+{
+  "schema": "luminous.symtropy.event-rng-throughput.v0.1",
+  "status": "microbenchmark_harness_no_winner_claim",
+  "workloads": [
+    "legacy_lcg_top53",
+    "philox4x64_core_block",
+    "event_address_construct_plus_word",
+    "event_address_construct_plus_block",
+    "event_address_prebuilt_scalar_word"
+  ],
+  "rounds": 5,
+  "workload_order": "rotated_by_round",
+  "metrics": [
+    "scalar_draws",
+    "elapsed_ns",
+    "draws_per_second",
+    "ns_per_draw",
+    "checksum"
+  ],
+  "correctness_controls": [
+    "checksums_stable_across_rounds",
+    "black_box_outputs"
+  ],
+  "nonclaims": [
+    "not_a_same_host_Random123_C_comparison",
+    "not_a_statistical_quality_comparison",
+    "not_a_SOTA_performance_claim",
+    "hosted_CI_speed_is_not_promotion_evidence"
+  ]
+}
