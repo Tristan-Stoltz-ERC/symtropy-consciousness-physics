@@ -30,22 +30,36 @@ pub struct PairedDifference {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PairingError {
-    EmptySample { condition: &'static str },
-    DuplicateSeed { condition: &'static str, seed_id: u64 },
-    MissingSeed { condition: &'static str, seed_id: u64 },
-    NonFiniteValue { condition: &'static str, seed_id: u64 },
+    EmptySample {
+        condition: &'static str,
+    },
+    DuplicateSeed {
+        condition: &'static str,
+        seed_id: u64,
+    },
+    MissingSeed {
+        condition: &'static str,
+        seed_id: u64,
+    },
+    NonFiniteValue {
+        condition: &'static str,
+        seed_id: u64,
+    },
 }
 
 impl fmt::Display for PairingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptySample { condition } => write!(f, "{condition} sample is empty"),
-            Self::DuplicateSeed { condition, seed_id } =>
-                write!(f, "{condition} contains duplicate seed {seed_id}"),
-            Self::MissingSeed { condition, seed_id } =>
-                write!(f, "{condition} is missing seed {seed_id}"),
-            Self::NonFiniteValue { condition, seed_id } =>
-                write!(f, "{condition} has a non-finite value for seed {seed_id}"),
+            Self::DuplicateSeed { condition, seed_id } => {
+                write!(f, "{condition} contains duplicate seed {seed_id}")
+            }
+            Self::MissingSeed { condition, seed_id } => {
+                write!(f, "{condition} is missing seed {seed_id}")
+            }
+            Self::NonFiniteValue { condition, seed_id } => {
+                write!(f, "{condition} has a non-finite value for seed {seed_id}")
+            }
         }
     }
 }
@@ -138,16 +152,19 @@ impl fmt::Display for InferenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyInput => write!(f, "at least one paired observation is required"),
-            Self::NonFiniteDifference { seed_id } =>
-                write!(f, "seed {seed_id} has a non-finite paired difference"),
-            Self::InvalidConfidenceLevel(v) =>
-                write!(f, "confidence level must be in (0, 1), got {v}"),
+            Self::NonFiniteDifference { seed_id } => {
+                write!(f, "seed {seed_id} has a non-finite paired difference")
+            }
+            Self::InvalidConfidenceLevel(v) => {
+                write!(f, "confidence level must be in (0, 1), got {v}")
+            }
             Self::ZeroReplicates => write!(f, "replicate count must be greater than zero"),
             Self::InvalidMargin(v) => write!(f, "equivalence margin must be positive, got {v}"),
             Self::InvalidInterval => write!(f, "confidence interval is invalid"),
             Self::InvalidAlpha(v) => write!(f, "alpha must be in (0, 1), got {v}"),
-            Self::InvalidPValue { label, value } =>
-                write!(f, "p-value for {label} must be in [0, 1], got {value}"),
+            Self::InvalidPValue { label, value } => {
+                write!(f, "p-value for {label} must be in [0, 1], got {value}")
+            }
             Self::DuplicateLabel(label) => write!(f, "duplicate comparison label: {label}"),
         }
     }
@@ -161,7 +178,9 @@ fn differences(pairs: &[PairedDifference]) -> Result<Vec<f64>, InferenceError> {
     let mut values = Vec::with_capacity(pairs.len());
     for pair in pairs {
         if !pair.difference.is_finite() {
-            return Err(InferenceError::NonFiniteDifference { seed_id: pair.seed_id });
+            return Err(InferenceError::NonFiniteDifference {
+                seed_id: pair.seed_id,
+            });
         }
         values.push(pair.difference);
     }
@@ -247,10 +266,10 @@ pub fn bootstrap_mean_interval(
     if config.replicates == 0 {
         return Err(InferenceError::ZeroReplicates);
     }
-    if !config.confidence_level.is_finite()
-        || !(0.0..1.0).contains(&config.confidence_level)
-    {
-        return Err(InferenceError::InvalidConfidenceLevel(config.confidence_level));
+    if !config.confidence_level.is_finite() || !(0.0..1.0).contains(&config.confidence_level) {
+        return Err(InferenceError::InvalidConfidenceLevel(
+            config.confidence_level,
+        ));
     }
     let mut rng = SplitMix64::new(config.rng_seed);
     let mut means = Vec::with_capacity(config.replicates);
@@ -356,7 +375,9 @@ pub fn paired_sign_flip_test(
     let n = values.len();
     let observed_sum: f64 = values.iter().sum();
     if !observed_sum.is_finite() || values.iter().map(|v| v.abs()).sum::<f64>().is_infinite() {
-        return Err(InferenceError::NonFiniteDifference { seed_id: pairs[0].seed_id });
+        return Err(InferenceError::NonFiniteDifference {
+            seed_id: pairs[0].seed_id,
+        });
     }
     let observed_mean = observed_sum / n as f64;
     let observed = observed_sum.abs();
@@ -368,7 +389,11 @@ pub fn paired_sign_flip_test(
         for mask in 0..total {
             let mut statistic = 0.0;
             for (index, value) in values.iter().copied().enumerate() {
-                statistic += if (mask >> index) & 1 == 0 { value } else { -value };
+                statistic += if (mask >> index) & 1 == 0 {
+                    value
+                } else {
+                    -value
+                };
             }
             if statistic.abs() + tolerance >= observed {
                 extreme += 1;
@@ -392,7 +417,11 @@ pub fn paired_sign_flip_test(
     for _ in 0..config.monte_carlo_draws {
         let mut statistic = 0.0;
         for value in values.iter().copied() {
-            statistic += if rng.next_u64() & 1 == 0 { value } else { -value };
+            statistic += if rng.next_u64() & 1 == 0 {
+                value
+            } else {
+                -value
+            };
         }
         if statistic.abs() + tolerance >= observed {
             extreme += 1;
@@ -437,7 +466,9 @@ pub fn holm_adjust(
             });
         }
     }
-    let mut indexed: Vec<(usize, &str, f64)> = p_values.iter().enumerate()
+    let mut indexed: Vec<(usize, &str, f64)> = p_values
+        .iter()
+        .enumerate()
         .map(|(index, (label, value))| (index, *label, *value))
         .collect();
     indexed.sort_by(|left, right| left.2.total_cmp(&right.2).then(left.0.cmp(&right.0)));
@@ -453,7 +484,10 @@ pub fn holm_adjust(
             reject_at_alpha: running_max <= alpha,
         });
     }
-    Ok(output.into_iter().map(|item| item.expect("every index is assigned")).collect())
+    Ok(output
+        .into_iter()
+        .map(|item| item.expect("every index is assigned"))
+        .collect())
 }
 
 /// Deterministic non-cryptographic generator for resampling only. It is not
@@ -462,7 +496,9 @@ struct SplitMix64 {
     state: u64,
 }
 impl SplitMix64 {
-    fn new(seed: u64) -> Self { Self { state: seed } }
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
     fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.state;
@@ -475,7 +511,9 @@ impl SplitMix64 {
         let threshold = bound.wrapping_neg() % bound;
         loop {
             let value = self.next_u64();
-            if value >= threshold { return (value % bound) as usize; }
+            if value >= threshold {
+                return (value % bound) as usize;
+            }
         }
     }
 }
@@ -485,43 +523,76 @@ mod tests {
     use super::*;
 
     fn make_pairs(values: &[f64]) -> Vec<PairedDifference> {
-        values.iter().copied().enumerate().map(|(i, difference)| {
-            PairedDifference {
+        values
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(i, difference)| PairedDifference {
                 seed_id: i as u64,
                 control: 0.0,
                 treatment: difference,
                 difference,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     #[test]
     fn pairing_is_by_seed_key_not_input_order() {
         let control = [
-            SeededValue { seed_id: 20, value: 10.0 },
-            SeededValue { seed_id: 10, value: 5.0 },
+            SeededValue {
+                seed_id: 20,
+                value: 10.0,
+            },
+            SeededValue {
+                seed_id: 10,
+                value: 5.0,
+            },
         ];
         let treatment = [
-            SeededValue { seed_id: 10, value: 7.0 },
-            SeededValue { seed_id: 20, value: 14.0 },
+            SeededValue {
+                seed_id: 10,
+                value: 7.0,
+            },
+            SeededValue {
+                seed_id: 20,
+                value: 14.0,
+            },
         ];
         let result = pair_by_seed(&control, &treatment).unwrap();
-        assert_eq!(result.iter().map(|p| p.seed_id).collect::<Vec<_>>(), vec![10, 20]);
-        assert_eq!(result.iter().map(|p| p.difference).collect::<Vec<_>>(), vec![2.0, 4.0]);
+        assert_eq!(
+            result.iter().map(|p| p.seed_id).collect::<Vec<_>>(),
+            vec![10, 20]
+        );
+        assert_eq!(
+            result.iter().map(|p| p.difference).collect::<Vec<_>>(),
+            vec![2.0, 4.0]
+        );
     }
 
     #[test]
     fn pairing_rejects_duplicate_missing_empty_and_non_finite_keys() {
         let duplicate = [
-            SeededValue { seed_id: 1, value: 1.0 },
-            SeededValue { seed_id: 1, value: 2.0 },
+            SeededValue {
+                seed_id: 1,
+                value: 1.0,
+            },
+            SeededValue {
+                seed_id: 1,
+                value: 2.0,
+            },
         ];
-        let one = [SeededValue { seed_id: 1, value: 3.0 }];
+        let one = [SeededValue {
+            seed_id: 1,
+            value: 3.0,
+        }];
         assert!(matches!(
             pair_by_seed(&duplicate, &one),
             Err(PairingError::DuplicateSeed { .. })
         ));
-        let other = [SeededValue { seed_id: 2, value: 4.0 }];
+        let other = [SeededValue {
+            seed_id: 2,
+            value: 4.0,
+        }];
         assert!(matches!(
             pair_by_seed(&one, &other),
             Err(PairingError::MissingSeed { .. })
@@ -530,7 +601,10 @@ mod tests {
             pair_by_seed(&[], &one),
             Err(PairingError::EmptySample { .. })
         ));
-        let nan = [SeededValue { seed_id: 1, value: f64::NAN }];
+        let nan = [SeededValue {
+            seed_id: 1,
+            value: f64::NAN,
+        }];
         assert!(matches!(
             pair_by_seed(&nan, &one),
             Err(PairingError::NonFiniteValue { .. })
@@ -548,7 +622,9 @@ mod tests {
 
     #[test]
     fn exact_sign_flip_enumerates_all_small_sample_assignments() {
-        let result = paired_sign_flip_test(&make_pairs(&[1.0, 1.0, 1.0]), SignFlipConfig::default()).unwrap();
+        let result =
+            paired_sign_flip_test(&make_pairs(&[1.0, 1.0, 1.0]), SignFlipConfig::default())
+                .unwrap();
         assert!(result.exact);
         assert_eq!(result.permutations_evaluated, 8);
         assert!((result.p_value - 0.25).abs() < 1e-12);
@@ -556,14 +632,18 @@ mod tests {
 
     #[test]
     fn zero_difference_sign_flip_has_unit_p_value() {
-        let result = paired_sign_flip_test(&make_pairs(&[0.0, 0.0]), SignFlipConfig::default()).unwrap();
+        let result =
+            paired_sign_flip_test(&make_pairs(&[0.0, 0.0]), SignFlipConfig::default()).unwrap();
         assert_eq!(result.p_value, 1.0);
     }
 
     #[test]
     fn monte_carlo_sign_flip_is_reproducible_and_receipted() {
         let input = make_pairs(&vec![1.0; EXACT_SIGN_FLIP_MAX_PAIRS + 1]);
-        let cfg = SignFlipConfig { monte_carlo_draws: 2_000, rng_seed: 17 };
+        let cfg = SignFlipConfig {
+            monte_carlo_draws: 2_000,
+            rng_seed: 17,
+        };
         let first = paired_sign_flip_test(&input, cfg).unwrap();
         assert_eq!(first, paired_sign_flip_test(&input, cfg).unwrap());
         assert!(!first.exact);
@@ -573,7 +653,11 @@ mod tests {
     #[test]
     fn bootstrap_is_reproducible_and_records_its_contract() {
         let input = make_pairs(&[1.0, 2.0, 3.0, 4.0, 5.0]);
-        let cfg = BootstrapConfig { replicates: 2_000, confidence_level: 0.95, rng_seed: 91 };
+        let cfg = BootstrapConfig {
+            replicates: 2_000,
+            confidence_level: 0.95,
+            rng_seed: 91,
+        };
         let first = bootstrap_mean_interval(&input, cfg).unwrap();
         assert_eq!(first, bootstrap_mean_interval(&input, cfg).unwrap());
         assert_eq!(first.rng_seed, 91);
@@ -583,8 +667,11 @@ mod tests {
     #[test]
     fn equivalence_requires_interval_containment_inside_preregistered_margin() {
         let interval = BootstrapInterval {
-            lower: -0.25, upper: 0.30, confidence_level: 0.90,
-            replicates: 10_000, rng_seed: 9,
+            lower: -0.25,
+            upper: 0.30,
+            confidence_level: 0.90,
+            replicates: 10_000,
+            rng_seed: 9,
         };
         assert_eq!(
             screen_equivalence(interval, 0.5).unwrap().status,
@@ -600,8 +687,10 @@ mod tests {
     #[test]
     fn holm_adjusted_values_are_monotone_and_validation_is_strict() {
         let values = holm_adjust(&[("A", 0.01), ("B", 0.03), ("C", 0.02)], 0.05).unwrap();
-        let by_label: BTreeMap<_, _> = values.iter()
-            .map(|item| (item.label.as_str(), item.adjusted_p_value)).collect();
+        let by_label: BTreeMap<_, _> = values
+            .iter()
+            .map(|item| (item.label.as_str(), item.adjusted_p_value))
+            .collect();
         assert!((by_label["A"] - 0.03).abs() < 1e-12);
         assert!((by_label["C"] - 0.04).abs() < 1e-12);
         assert!((by_label["B"] - 0.04).abs() < 1e-12);
@@ -614,11 +703,19 @@ mod tests {
         let input = make_pairs(&[1.0, 2.0]);
         assert!(bootstrap_mean_interval(
             &input,
-            BootstrapConfig { replicates: 0, ..BootstrapConfig::default() }
-        ).is_err());
+            BootstrapConfig {
+                replicates: 0,
+                ..BootstrapConfig::default()
+            }
+        )
+        .is_err());
         assert!(bootstrap_mean_interval(
             &input,
-            BootstrapConfig { confidence_level: 1.0, ..BootstrapConfig::default() }
-        ).is_err());
+            BootstrapConfig {
+                confidence_level: 1.0,
+                ..BootstrapConfig::default()
+            }
+        )
+        .is_err());
     }
 }
