@@ -32,7 +32,7 @@ enum BenchmarkKind {
 }
 
 impl BenchmarkKind {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::LegacyLcg53,
         Self::PhiloxCoreBlock,
         Self::EventConstructWord,
