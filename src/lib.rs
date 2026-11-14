@@ -23,6 +23,7 @@ pub mod curvature;
 pub mod dimensional_leakage;
 pub mod energy;
 pub mod experiment_seed;
+pub mod event_rng;
 pub mod fep_gradient;
 pub mod harmony_field;
 pub mod prey;
