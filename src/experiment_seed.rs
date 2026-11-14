@@ -34,7 +34,12 @@ impl ExperimentSeedSchedule {
         let explicit = env::var("SYMTROPY_SEED_INDICES").ok();
         let start = env::var("SYMTROPY_SEED_START_INDEX").ok();
         let count = env::var("SYMTROPY_SEED_COUNT").ok();
-        Self::from_config(default_count, explicit.as_deref(), start.as_deref(), count.as_deref())
+        Self::from_config(
+            default_count,
+            explicit.as_deref(),
+            start.as_deref(),
+            count.as_deref(),
+        )
     }
 
     fn from_config(
@@ -88,15 +93,15 @@ impl ExperimentSeedSchedule {
             parsed
         } else {
             let first = match start {
-                Some(value) => value.parse::<u64>().map_err(|_| {
-                    format!("invalid SYMTROPY_SEED_START_INDEX '{}'", value)
-                })?,
+                Some(value) => value
+                    .parse::<u64>()
+                    .map_err(|_| format!("invalid SYMTROPY_SEED_START_INDEX '{}'", value))?,
                 None => 0,
             };
             let number = match count {
-                Some(value) => value.parse::<usize>().map_err(|_| {
-                    format!("invalid SYMTROPY_SEED_COUNT '{}'", value)
-                })?,
+                Some(value) => value
+                    .parse::<usize>()
+                    .map_err(|_| format!("invalid SYMTROPY_SEED_COUNT '{}'", value))?,
                 None => default_count,
             };
             if number == 0 || number > MAX_EXPERIMENT_SEEDS {
@@ -107,7 +112,8 @@ impl ExperimentSeedSchedule {
             }
             let number_u64 = u64::try_from(number)
                 .map_err(|_| "SYMTROPY_SEED_COUNT does not fit in u64".to_string())?;
-            let end = first.checked_add(number_u64)
+            let end = first
+                .checked_add(number_u64)
                 .ok_or_else(|| "seed index range overflows u64".to_string())?;
             (first..end).collect()
         };
@@ -126,7 +132,11 @@ impl ExperimentSeedSchedule {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(Self { indices, seeds, overridden })
+        Ok(Self {
+            indices,
+            seeds,
+            overridden,
+        })
     }
 
     /// Logical indices in execution order.
@@ -154,8 +164,18 @@ impl ExperimentSeedSchedule {
 
     /// Stable textual identity for run receipts and benchmark manifests.
     pub fn describe(&self) -> String {
-        let indices = self.indices.iter().map(u64::to_string).collect::<Vec<_>>().join(",");
-        let seeds = self.seeds.iter().map(u64::to_string).collect::<Vec<_>>().join(",");
+        let indices = self
+            .indices
+            .iter()
+            .map(u64::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        let seeds = self
+            .seeds
+            .iter()
+            .map(u64::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
         format!(
             "indices=[{}];seeds=[{}];formula={}+index*{}",
             indices, seeds, DEFAULT_SEED_BASE, DEFAULT_SEED_STRIDE
@@ -178,19 +198,24 @@ mod tests {
     #[test]
     fn range_selector_produces_disjoint_holdout_ranges() {
         let train = ExperimentSeedSchedule::from_config(20, None, Some("0"), Some("10")).unwrap();
-        let holdout = ExperimentSeedSchedule::from_config(20, None, Some("10"), Some("10")).unwrap();
+        let holdout =
+            ExperimentSeedSchedule::from_config(20, None, Some("10"), Some("10")).unwrap();
         assert_eq!(train.indices(), &(0_u64..10).collect::<Vec<_>>());
         assert_eq!(holdout.indices(), &(10_u64..20).collect::<Vec<_>>());
         assert!(train.is_overridden());
         assert!(holdout.is_overridden());
-        assert!(train.indices().iter().all(|index| !holdout.indices().contains(index)));
+        assert!(train
+            .indices()
+            .iter()
+            .all(|index| !holdout.indices().contains(index)));
     }
 
     #[test]
     fn explicit_indices_preserve_order_and_seed_formula() {
-        let schedule = ExperimentSeedSchedule::from_config(10, Some("7, 2, 9"), None, None).unwrap();
+        let schedule =
+            ExperimentSeedSchedule::from_config(10, Some("7, 2, 9"), None, None).unwrap();
         assert_eq!(schedule.indices(), &[7, 2, 9]);
-        assert_eq!(schedule.seeds(), &[6_021, 2_036, 8_973]);
+        assert_eq!(schedule.seeds(), &[7_021, 2_036, 9_015]);
     }
 
     #[test]
@@ -216,8 +241,17 @@ mod tests {
     fn invalid_counts_and_overflow_are_rejected() {
         assert!(ExperimentSeedSchedule::from_config(10, None, None, Some("0")).is_err());
         assert!(ExperimentSeedSchedule::from_config(10, None, Some("nope"), Some("2")).is_err());
-        assert!(ExperimentSeedSchedule::from_config(10, None, Some("18446744073709551615"), Some("2")).is_err());
-        assert!(ExperimentSeedSchedule::from_config(10, None, Some("18446744073709551615"), None).is_err());
+        assert!(ExperimentSeedSchedule::from_config(
+            10,
+            None,
+            Some("18446744073709551615"),
+            Some("2")
+        )
+        .is_err());
+        assert!(
+            ExperimentSeedSchedule::from_config(10, None, Some("18446744073709551615"), None)
+                .is_err()
+        );
     }
 
     #[test]
