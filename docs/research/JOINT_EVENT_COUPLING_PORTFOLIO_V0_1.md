@@ -22,7 +22,7 @@ $$
 Y_0=U-V,\qquad Y_1=-U'+V'.
 $$
 
-Every admissible coupling preserves the Uniform(0,1) squared marginal law in each arm.
+Every admissible coupling preserves the joint marginal law Uniform(0,1)^2 in each arm.
 
 - Independent treatment draws: Var(Y1-Y0)=1/3.
 - Same-event identity U'=U,V'=V: Var(Y1-Y0)=2/3. Reusing the same streams doubles estimator variance.
