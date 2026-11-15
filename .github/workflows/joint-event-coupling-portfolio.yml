@@ -66,8 +66,8 @@ jobs:
           for record in "${records[@]}"; do
             jq -e '.schema == "luminous.symtropy.joint-coupling-portfolio.v0.1"' <<< "$record" >/dev/null
           done
-          swap_allowed="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "cross_family_swap" and .admissible == true)] | length')"
-          swap_rejected="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "cross_family_swap" and .admissible == false)] | length')"
+          swap_allowed="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "cross_family_swap" and .admissible == true and .marginals_preserved == true and .semantically_admissible == true and .eligible_for_selection == true)] | length')"
+          swap_rejected="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "cross_family_swap" and .admissible == false and .marginals_preserved == true and .semantically_admissible == false and .eligible_for_selection == false)] | length')"
           selected_count="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "pilot_selected")] | length')"
           [[ "$swap_allowed" -eq 1 && "$swap_rejected" -eq 1 && "$selected_count" -eq 2 ]]
           grep -q '^benchmark_status=PASS$' "$RUNNER_TEMP/joint-coupling.txt"
