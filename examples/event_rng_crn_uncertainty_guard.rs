@@ -311,17 +311,14 @@ fn estimate_holdout(
         for subject in 0..SUBJECTS_PER_REPLICATE {
             let common_u = event_uniform(seed, COMMON_NAMESPACE, subject, 0);
             let common_v = event_uniform(seed, COMMON_NAMESPACE, subject, 1);
-            let independent_u =
-                event_uniform(seed, INDEPENDENT_U_NAMESPACE, subject, 0);
-            let independent_v =
-                event_uniform(seed, INDEPENDENT_V_NAMESPACE, subject, 1);
+            let independent_u = event_uniform(seed, INDEPENDENT_U_NAMESPACE, subject, 0);
+            let independent_v = event_uniform(seed, INDEPENDENT_V_NAMESPACE, subject, 1);
 
             let control = control_outcome(common_u, common_v);
 
             let all_independent =
                 treatment_outcome(independent_u, independent_v, beta_u, beta_v) - control;
-            let all_shared =
-                treatment_outcome(common_u, common_v, beta_u, beta_v) - control;
+            let all_shared = treatment_outcome(common_u, common_v, beta_u, beta_v) - control;
 
             let point_u = select_draw(family_u.point_decision, common_u, independent_u);
             let point_v = select_draw(family_v.point_decision, common_v, independent_v);
@@ -352,7 +349,10 @@ fn estimate_holdout(
 }
 
 fn column(replicates: &[HoldoutReplicate], index: usize) -> Vec<f64> {
-    replicates.iter().map(|replicate| replicate.estimates[index]).collect()
+    replicates
+        .iter()
+        .map(|replicate| replicate.estimates[index])
+        .collect()
 }
 
 fn run_case(beta_u: f64, beta_v: f64, case_index: usize) -> CaseResult {
@@ -421,8 +421,15 @@ fn run_case(beta_u: f64, beta_v: f64, case_index: usize) -> CaseResult {
 }
 
 fn print_case(case: &CaseResult) {
-    let abstentions = (if case.family_u.guarded_decision == Decision::Abstain { 1 } else { 0 })
-        + (if case.family_v.guarded_decision == Decision::Abstain { 1 } else { 0 });
+    let abstentions = (if case.family_u.guarded_decision == Decision::Abstain {
+        1
+    } else {
+        0
+    }) + (if case.family_v.guarded_decision == Decision::Abstain {
+        1
+    } else {
+        0
+    });
 
     println!(
         "CRN_GUARD_JSON={{\"schema\":\"luminous.symtropy.crn-uncertainty-guard.v0.1\",\"beta_u\":{:.12e},\"beta_v\":{:.12e},\"train_replicates\":{},\"holdout_replicates\":{},\"subjects_per_replicate\":{},\"covariance_bootstrap_draws\":{},\"covariance_ci_level\":0.99,\"covariance_deadband\":{:.9},\"known_ate\":{:.12e},\"family_u_covariance_mean\":{:.12e},\"family_u_ci99\":[{:.12e},{:.12e}],\"family_u_point\":\"{}\",\"family_u_guard\":\"{}\",\"family_u_oracle\":\"{}\",\"family_v_covariance_mean\":{:.12e},\"family_v_ci99\":[{:.12e},{:.12e}],\"family_v_point\":\"{}\",\"family_v_guard\":\"{}\",\"family_v_oracle\":\"{}\",\"guard_abstentions\":{},\"mean_all_independent\":{:.12e},\"mean_all_shared\":{:.12e},\"mean_point_selector\":{:.12e},\"mean_guard_selector\":{:.12e},\"mean_oracle\":{:.12e},\"variance_ratio_all_shared\":{:.9},\"variance_ratio_point_selector\":{:.9},\"variance_ratio_guard_selector\":{:.9},\"variance_ratio_oracle\":{:.9},\"guard_variance_ratio_ci95\":[{:.9},{:.9}],\"pass\":{}}}",
@@ -502,12 +509,7 @@ fn main() {
 
     // beta=-16/15 is the analytic zero-covariance boundary for this model.
     // beta=-1.05 is a deliberately near-deadband positive-covariance case.
-    const CASES: [(f64, f64); 4] = [
-        (0.5, -1.5),
-        (-1.5, 0.5),
-        (-1.05, -1.5),
-        (-16.0 / 15.0, 0.5),
-    ];
+    const CASES: [(f64, f64); 4] = [(0.5, -1.5), (-1.5, 0.5), (-1.05, -1.5), (-16.0 / 15.0, 0.5)];
 
     let mut all_pass = true;
     for (case_index, (beta_u, beta_v)) in CASES.into_iter().enumerate() {
@@ -541,28 +543,40 @@ mod tests {
     fn guarded_selector_requires_the_interval_to_clear_the_deadband() {
         assert_eq!(
             choose_with_deadband(
-                Interval { lower: 0.02, upper: 0.04 },
+                Interval {
+                    lower: 0.02,
+                    upper: 0.04
+                },
                 COVARIANCE_DEADBAND
             ),
             Decision::Shared
         );
         assert_eq!(
             choose_with_deadband(
-                Interval { lower: -0.04, upper: -0.02 },
+                Interval {
+                    lower: -0.04,
+                    upper: -0.02
+                },
                 COVARIANCE_DEADBAND
             ),
             Decision::Independent
         );
         assert_eq!(
             choose_with_deadband(
-                Interval { lower: -0.0005, upper: 0.0015 },
+                Interval {
+                    lower: -0.0005,
+                    upper: 0.0015
+                },
                 COVARIANCE_DEADBAND
             ),
             Decision::Abstain
         );
         assert_eq!(
             choose_with_deadband(
-                Interval { lower: 0.0001, upper: 0.0009 },
+                Interval {
+                    lower: 0.0001,
+                    upper: 0.0009
+                },
                 COVARIANCE_DEADBAND
             ),
             Decision::Abstain
