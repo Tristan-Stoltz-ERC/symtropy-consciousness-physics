@@ -54,7 +54,7 @@ jobs:
       - name: Validate replay-probe shell syntax
         run: bash -n scripts/verify-cooperation-decomposition-determinism.sh
 
-      - name: Run five independent process replications
+      - name: Compare legacy and deterministic fresh-process output
         shell: bash
         env:
           REPEATS: "5"
