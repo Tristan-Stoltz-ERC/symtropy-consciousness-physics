@@ -95,6 +95,15 @@ pub struct ElementBalance {
     pub status: BalanceStatus,
 }
 
+/// Process-level result. Per-element checks may pass while the overall
+/// inventory remains unquantified if any stream has incomplete composition.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ElementalBalanceReport {
+    pub element_balances: Vec<ElementBalance>,
+    pub inventory_complete: bool,
+    pub overall_status: BalanceStatus,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum KernelError {
     InvalidTolerance,
@@ -248,7 +257,7 @@ pub fn elemental_balance(
     process: &ResourceProcess,
     absolute_tolerance_kg: f64,
     z_score: f64,
-) -> Result<Vec<ElementBalance>, KernelError> {
+) -> Result<ElementalBalanceReport, KernelError> {
     if !absolute_tolerance_kg.is_finite() || absolute_tolerance_kg < 0.0 {
         return Err(KernelError::InvalidTolerance);
     }
@@ -330,7 +339,32 @@ pub fn elemental_balance(
         });
     }
 
-    Ok(balances)
+    let inventory_complete = process
+        .inputs
+        .iter()
+        .chain(process.products.iter())
+        .chain(process.waste_streams.iter())
+        .all(|flow| flow.composition_complete);
+    let overall_status = if balances
+        .iter()
+        .any(|entry| entry.status == BalanceStatus::OutsideTolerance)
+    {
+        BalanceStatus::OutsideTolerance
+    } else if !inventory_complete
+        || balances
+            .iter()
+            .any(|entry| entry.status == BalanceStatus::Unquantified)
+    {
+        BalanceStatus::Unquantified
+    } else {
+        BalanceStatus::WithinTolerance
+    };
+
+    Ok(ElementalBalanceReport {
+        element_balances: balances,
+        inventory_complete,
+        overall_status,
+    })
 }
 
 #[cfg(test)]
@@ -382,9 +416,10 @@ mod tests {
     #[test]
     fn stoichiometric_fixture_balances_each_element() {
         let result = elemental_balance(&water_electrolysis_fixture(), 1e-9, 3.0).unwrap();
-        assert_eq!(result.len(), 2);
-        assert!(result.iter().all(|entry| entry.status == BalanceStatus::WithinTolerance));
-        assert!(result.iter().all(|entry| entry.residual_kg.abs() < 1e-12));
+        assert_eq!(result.element_balances.len(), 2);
+        assert_eq!(result.overall_status, BalanceStatus::WithinTolerance);
+        assert!(result.element_balances.iter().all(|entry| entry.status == BalanceStatus::WithinTolerance));
+        assert!(result.element_balances.iter().all(|entry| entry.residual_kg.abs() < 1e-12));
     }
 
     #[test]
@@ -392,7 +427,7 @@ mod tests {
         let mut process = water_electrolysis_fixture();
         process.products[1].elements[0].mass_kg = 0.80;
         let result = elemental_balance(&process, 1e-6, 3.0).unwrap();
-        let oxygen = result.iter().find(|entry| entry.element == "O").unwrap();
+        let oxygen = result.element_balances.iter().find(|entry| entry.element == "O").unwrap();
         assert_eq!(oxygen.status, BalanceStatus::OutsideTolerance);
         assert!(oxygen.residual_kg > 0.08);
     }
@@ -402,9 +437,11 @@ mod tests {
         let mut process = water_electrolysis_fixture();
         process.products[0].composition_complete = false;
         let result = elemental_balance(&process, 1e-6, 3.0).unwrap();
-        let oxygen = result.iter().find(|entry| entry.element == "O").unwrap();
+        assert_eq!(result.overall_status, BalanceStatus::Unquantified);
+        assert!(!result.inventory_complete);
+        let oxygen = result.element_balances.iter().find(|entry| entry.element == "O").unwrap();
         assert_eq!(oxygen.status, BalanceStatus::Unquantified);
-        let hydrogen = result.iter().find(|entry| entry.element == "H").unwrap();
+        let hydrogen = result.element_balances.iter().find(|entry| entry.element == "H").unwrap();
         assert_eq!(hydrogen.status, BalanceStatus::WithinTolerance);
     }
 
@@ -413,7 +450,7 @@ mod tests {
         let mut process = water_electrolysis_fixture();
         process.inputs[0].elements[0].standard_uncertainty_kg = None;
         let result = elemental_balance(&process, 1e-6, 3.0).unwrap();
-        let hydrogen = result.iter().find(|entry| entry.element == "H").unwrap();
+        let hydrogen = result.element_balances.iter().find(|entry| entry.element == "H").unwrap();
         assert_eq!(hydrogen.status, BalanceStatus::Unquantified);
     }
 
