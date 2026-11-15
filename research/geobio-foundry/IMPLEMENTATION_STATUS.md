@@ -35,7 +35,7 @@ No CI result is implied by these local/document checks. The programme remains a 
 - Added `SOTA_GAP_ANALYSIS_2026-11.md`, covering current NASA ISRU status, BioAsteroid experimental limitations, bioreactor heterogeneity, lava-tube modelling, asteroid contact-sequence robotics, and 2026 COSPAR planetary-protection policy.
 - Added an isolated, dependency-free Rust reference crate at `kernel/`.
 - Implemented typed material-flow records, explicit elemental mass, kg/J conventions, provenance digest checks, independent-witness requirements for reproduced/qualified claims, and uncertainty-aware per-element balance residuals.
-- Added seven unit tests covering a stoichiometric water-electrolysis fixture, missing product mass, partial-composition abstention, missing uncertainty, negative mass, qualification witness, and digest validation.
+- Added ten unit tests covering stoichiometric balance, missing product mass, process-level incomplete-inventory abstention, unassayed-element abstention, missing uncertainty, negative and non-finite mass, aggregate overflow, qualification witness, and digest validation.
 
 ### Second-increment validation boundaries
 
