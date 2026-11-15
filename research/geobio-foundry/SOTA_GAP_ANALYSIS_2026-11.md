@@ -39,6 +39,27 @@ This reinforces that power, energy storage, oxygen, materials and manufacturing 
 
 Source: https://www.nasa.gov/news-release/nasa-calls-for-proposals-to-accelerate-lunar-surface-technologies/
 
+
+
+### 2.2.1 NASA's integrated engineering baselines: do not reinvent the whole stack
+
+NASA's current Lunar Surface Technology portfolio shows that several integration ideas in the original GeoBio proposal already have serious programmes behind them:
+
+- **Blue Alchemist (Blue Origin):** NASA describes an end-to-end regolith-to-power system and reports integrated autonomous operation of eight technologies, processing regolith simulants into silicon solar cells, aluminium wires, oxygen, iron, and slag under lunar-environment test conditions.
+- **Carbothermal Reduction Demonstration (CaRD):** NASA reports 2026 integrated prototype testing with concentrated solar energy extracting carbon monoxide from simulated lunar regolith and confirming oxygen production through the solar-driven reaction; thermal-vacuum reactor testing was reported in 2025.
+- **CADRE:** NASA's cooperative autonomous distributed robotic exploration project is designed to demonstrate multi-rover mapping, obstacle avoidance and ground-penetrating-radar surveys.
+- **ARMADAS:** NASA is developing modular robotic construction in which robots assemble reconfigurable structures from small voxel-like units.
+- **Infrastructure Pilot Excavator (IPEx):** NASA describes a lunar regolith excavation system designed to move on the order of 20 metric tonnes over a mission. This is a design capability statement, not a lunar surface operational result.
+- **MRE:** NASA's Lunar Resources reactor demonstrated oxygen extraction from simulant in vacuum; NASA describes metal-rich slag as a potential manufacturing feedstock.
+
+These are not all at the same maturity level. Blue Alchemist and CaRD are reported prototype/integrated test activities; CADRE and ARMADAS are development/demonstration programmes; IPEx throughput is a design target; MRE has a specific vacuum test result. GeoBio must preserve those distinctions.
+
+**Competitive consequence:** “integrated lunar ISRU”, “cooperative mapping”, “modular robotic construction”, and “regolith-derived manufacturing” are not sufficient novelty claims. Our differentiator must be the geology-to-design compiler, uncertainty and value-of-information workflow, biological/abiotic co-optimization, pressure-compartment assurance in natural voids, and cross-system evidence qualification.
+
+Sources:
+- NASA Lunar Surface Technology portfolio: https://www.nasa.gov/lunar-surface-technology/
+- NASA's ISRU overview: https://www.nasa.gov/overview-in-situ-resource-utilization/
+
 ### 2.3 BioAsteroid: important proof of principle, not a self-sufficient factory
 
 The 2026 BioAsteroid study tested bacterial and fungal bioleaching of 44 elements from L-chondrite meteorite material aboard the ISS under microgravity. It reports that Penicillium simplicissimum enhanced palladium release to 549.3 ± 234.4% of the non-biological control in microgravity (about 5.5 times the control under the tested conditions).
