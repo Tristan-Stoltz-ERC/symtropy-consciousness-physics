@@ -1,0 +1,53 @@
+{
+  "schema": "luminous.symtropy.deterministic-reductions-overhead.v0.1",
+  "source_feature": "deterministic-reductions",
+  "exact_toolchain": "1.100.0",
+  "paired_trials": 30,
+  "warmups_per_mode": 2,
+  "seed_partition": {
+    "start_index": 0,
+    "count": 20,
+    "formula": "42+997i"
+  },
+  "modes": [
+    "historical_default_features",
+    "deterministic_reductions_feature"
+  ],
+  "build": {
+    "separate_fresh_target_directories": true,
+    "registry_warmed_before_offline_build": true,
+    "record_build_time": true,
+    "record_binary_bytes": true
+  },
+  "runtime": {
+    "wall_clock_ns": true,
+    "peak_rss_kib": true,
+    "alternating_order": true,
+    "output_normalization": false
+  },
+  "analysis": {
+    "paired_bootstrap_draws": 10000,
+    "confidence_level": 0.95,
+    "report": [
+      "median_speedup",
+      "median_runtime_overhead_percent",
+      "peak_rss_ratio",
+      "peak_rss_delta",
+      "stdout_digest_cardinality",
+      "stderr_digest_cardinality"
+    ]
+  },
+  "gates": {
+    "deterministic_mode_one_stdout_digest": true,
+    "deterministic_mode_one_stderr_digest": true,
+    "historical_divergence_diagnostic_only": true,
+    "runtime_overhead_target_percent": 3,
+    "overhead_target_is_not_current_pass_fail_gate": true
+  },
+  "claims_not_established": [
+    "cross_architecture_determinism",
+    "whole_repository_determinism",
+    "compiler_speedup",
+    "universal_under_3_percent_overhead"
+  ]
+}
