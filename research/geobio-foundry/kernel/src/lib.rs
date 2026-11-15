@@ -100,6 +100,7 @@ pub enum KernelError {
     InvalidTolerance,
     InvalidZScore,
     InvalidProcess(Vec<String>),
+    NumericalOverflow(String),
 }
 
 impl std::fmt::Display for KernelError {
@@ -109,6 +110,9 @@ impl std::fmt::Display for KernelError {
             Self::InvalidZScore => write!(f, "z-score must be finite and >= 0"),
             Self::InvalidProcess(errors) => {
                 write!(f, "invalid process: {}", errors.join("; "))
+            }
+            Self::NumericalOverflow(context) => {
+                write!(f, "numerical overflow while calculating {context}")
             }
         }
     }
@@ -291,16 +295,30 @@ pub fn elemental_balance(
         }
 
         let residual = input_mass - output_mass;
+        if !input_mass.is_finite()
+            || !output_mass.is_finite()
+            || !variance.is_finite()
+            || !residual.is_finite()
+        {
+            return Err(KernelError::NumericalOverflow(format!("elemental balance for {element}")));
+        }
         let sigma = if uncertainty_complete && composition_complete {
             Some(variance.sqrt())
         } else {
             None
         };
         let status = match sigma {
-            Some(s) if residual.abs() <= absolute_tolerance_kg + z_score * s => {
-                BalanceStatus::WithinTolerance
+            Some(s) => {
+                let threshold = absolute_tolerance_kg + z_score * s;
+                if !threshold.is_finite() {
+                    return Err(KernelError::NumericalOverflow(format!("tolerance for {element}")));
+                }
+                if residual.abs() <= threshold {
+                    BalanceStatus::WithinTolerance
+                } else {
+                    BalanceStatus::OutsideTolerance
+                }
             }
-            Some(_) => BalanceStatus::OutsideTolerance,
             None => BalanceStatus::Unquantified,
         };
 
