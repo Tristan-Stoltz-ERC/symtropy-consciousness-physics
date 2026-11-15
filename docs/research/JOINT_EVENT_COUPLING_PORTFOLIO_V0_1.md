@@ -27,7 +27,7 @@ Every admissible coupling preserves the joint marginal law Uniform(0,1)^2 in eac
 - Independent treatment draws: Var(Y1-Y0)=1/3.
 - Same-event identity U'=U,V'=V: Var(Y1-Y0)=2/3. Reusing the same streams doubles estimator variance.
 - Antithetic U'=1-U,V'=1-V: Y1=Y0, giving theoretical variance zero.
-- Cross-family permutation U'=V,V'=U: also gives theoretical variance zero, but only when the two semantic event families have an explicit exchangeability declaration.
+- Cross-family permutation U'=V,V'=U: also gives theoretical variance zero, but only when the two semantic event families have an explicit exchangeability declaration. Even in the non-exchangeable case, the coordinate permutation still preserves the toy Uniform(0,1)^2 marginal distribution; it is rejected because the semantic coupling is not admissible, not because it breaks the marginal law.
 
 The diagonal same-family identity covariances are both negative:
 
