@@ -29,6 +29,23 @@
 
 No CI result is implied by these local/document checks. The programme remains a research proposal and schema prototype, not an implemented or qualified engineering system.
 
+
+## Second increment — 2026-11-15
+
+- Added `SOTA_GAP_ANALYSIS_2026-11.md`, covering current NASA ISRU status, BioAsteroid experimental limitations, bioreactor heterogeneity, lava-tube modelling, asteroid contact-sequence robotics, and 2026 COSPAR planetary-protection policy.
+- Added an isolated, dependency-free Rust reference crate at `kernel/`.
+- Implemented typed material-flow records, explicit elemental mass, kg/J conventions, provenance digest checks, independent-witness requirements for reproduced/qualified claims, and uncertainty-aware per-element balance residuals.
+- Added seven unit tests covering a stoichiometric water-electrolysis fixture, missing product mass, partial-composition abstention, missing uncertainty, negative mass, qualification witness, and digest validation.
+
+### Second-increment validation boundaries
+
+- Rust source and unit tests: **authored, not compiled or executed** (the available runtime has no rustc/cargo).
+- JSON syntax: previous check remains **PASS**; JSON Schema meta-validation remains **NOT RUN**.
+- CI: **NOT CHECKED**.
+- Physical, laboratory, field, orbital, or flight validation: **NOT PERFORMED**.
+
+The elemental uncertainty calculation uses root-sum-square and assumes independent measurement errors. Correlated uncertainty, detection limits, elemental ontology mapping, complete process heat balances, and JSON deserialization are out of scope for v0.1 and must be addressed before operational use.
+
 ## Immediate next increments
 
 1. Add schema validation fixtures: valid record, missing provenance, unknown evidence state, negative mass, missing unit, and unknown origin.
