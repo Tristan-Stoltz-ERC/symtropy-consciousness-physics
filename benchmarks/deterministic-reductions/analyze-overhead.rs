@@ -267,9 +267,15 @@ fn self_test() -> Result<(), String> {
     let mut csv = String::from(HEADER);
     csv.push('\n');
     for trial in 1..=8 {
+        let first_mode = if trial % 2 == 1 {
+            "legacy"
+        } else {
+            "deterministic"
+        };
         csv.push_str(&format!(
-            "{},legacy,{},{},{},{},{},{},{},{}\n",
+            "{},{},{},{},{},{},{},{},{},{}\n",
             trial,
+            first_mode,
             100 + trial,
             103 + trial,
             1000,
