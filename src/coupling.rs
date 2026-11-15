@@ -435,7 +435,22 @@ impl<const D: usize> ConsciousnessField<D> {
             self.collective_phi = 0.0;
             return;
         }
-        let sum: f64 = self.entities.values().map(|e| e.phi()).sum();
+        // HashMap iteration order is randomized. Because this reduction feeds
+        // collective_phi back into later simulation inputs, an unordered sum
+        // can amplify last-bit differences into different trajectories.
+        // Sort by the stable model handle and use compensated summation.
+        let mut ordered_entities: Vec<_> = self.entities.iter().collect();
+        ordered_entities.sort_unstable_by_key(|(handle, _)| **handle);
+
+        let mut sum = 0.0_f64;
+        let mut correction = 0.0_f64;
+        for (_, entity) in ordered_entities {
+            let value = entity.phi();
+            let adjusted = value - correction;
+            let next = sum + adjusted;
+            correction = (next - sum) - adjusted;
+            sum = next;
+        }
         self.collective_phi = sum / self.entities.len() as f64;
     }
 }
@@ -464,9 +479,14 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     fn modulate_impulse(&self, impulse: f64, contact_point: &SVector<f64, D>) -> f64 {
         // Sanctuary zone dampening
         let mut result = impulse;
-        for sanctuary in self.sanctuaries.values() {
-            let m = sanctuary.impulse_multiplier(contact_point);
-            result *= m;
+        // The multiplication is mathematically commutative, but floating-point
+        // products depend on evaluation order. Use stable BodyHandle order so
+        // hash seeding cannot change collision impulses.
+        let mut ordered_sanctuaries: Vec<_> = self.sanctuaries.iter().collect();
+        ordered_sanctuaries.sort_unstable_by_key(|(handle, _)| **handle);
+        for (_, sanctuary) in ordered_sanctuaries {
+            let multiplier = sanctuary.impulse_multiplier(contact_point);
+            result *= multiplier;
         }
         result
     }
@@ -566,6 +586,63 @@ mod tests {
         assert!(phi >= 0.0, "phi should be >= 0, got {phi}");
         // The equation was computed (result exists)
         assert!(field.entities.get(&handle).unwrap().result.is_some());
+    }
+
+    #[test]
+    fn collective_phi_is_bitwise_stable_across_registration_orders() {
+        fn build(order: &[usize]) -> ConsciousnessField<3> {
+            let mut field = ConsciousnessField::<3>::new();
+            for &index in order {
+                let handle = BodyHandle(index);
+                field.register(handle, 100.0, 10.0);
+                let phi = 0.07 + (index as f64) * 0.037_123_456_789;
+                field.update_entity(handle, &test_inputs(phi), symtropy_math::Point::origin());
+            }
+            field
+        }
+
+        let forward = (0..31).collect::<Vec<_>>();
+        let reverse = (0..31).rev().collect::<Vec<_>>();
+        let first = build(&forward);
+        let second = build(&reverse);
+
+        assert_eq!(
+            first.collective_phi.to_bits(),
+            second.collective_phi.to_bits(),
+            "collective reduction must not depend on HashMap insertion/hash order"
+        );
+    }
+
+    #[test]
+    fn sanctuary_impulse_product_is_bitwise_stable_across_registration_orders() {
+        fn build(order: &[usize]) -> ConsciousnessField<3> {
+            let mut field = ConsciousnessField::<3>::new();
+            for &index in order {
+                let handle = BodyHandle(index);
+                field.register(handle, 100.0, 10.0);
+                let zone = field.sanctuaries.get_mut(&handle).unwrap();
+                zone.active = true;
+                zone.radius = 10.0;
+                zone.center = symtropy_math::Point::origin();
+                zone.dampening = 0.11 + (index as f64) * 0.013_271_828_182;
+            }
+            field
+        }
+
+        let forward = (0..31).collect::<Vec<_>>();
+        let reverse = (0..31).rev().collect::<Vec<_>>();
+        let first = build(&forward);
+        let second = build(&reverse);
+        let contact_point = SVector::from([0.0, 0.0, 0.0]);
+
+        let first_result = first.modulate_impulse(1.0, &contact_point);
+        let second_result = second.modulate_impulse(1.0, &contact_point);
+
+        assert_eq!(
+            first_result.to_bits(),
+            second_result.to_bits(),
+            "sanctuary product must not depend on HashMap insertion/hash order"
+        );
     }
 
     #[test]
