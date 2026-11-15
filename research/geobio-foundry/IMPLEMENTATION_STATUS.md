@@ -48,6 +48,7 @@ The elemental uncertainty calculation uses root-sum-square and assumes independe
 
 
 - Added `BENCHMARK_PROTOCOL_v0.1.md` with separate evidence tiers, preregistered candidate targets, baseline matrix, blind-test rules, failure dispositions, and release gates.
+- Added a process-level balance report so per-element passes cannot hide an incomplete overall inventory. The report exposes inventory completeness and an overall pass/fail/unquantified status.
 - Hardened the Rust reference kernel to reject numerical overflow in aggregate elemental balances and tolerance calculations.
 
 ## Immediate next increments
