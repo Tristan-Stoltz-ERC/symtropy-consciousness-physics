@@ -454,3 +454,130 @@ mod tests {
         assert_eq!(budget.fraction_remaining(), 0.0);
     }
 }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(256))]
+
+        #[test]
+        fn generated_operation_sequences_preserve_energy_reference_model(
+            operations in proptest::collection::vec(
+                (0u8..4, proptest::prelude::any::<f64>()),
+                0..128
+            )
+        ) {
+            let max_energy = 1_000.0_f64;
+            let heat_capacity = 100.0_f64;
+            let mut budget = EnergyBudget::new(max_energy);
+
+            // Independent scalar reference model. It models the public
+            // transition contract rather than calling EnergyBudget methods.
+            let mut expected_available = max_energy;
+            let mut expected_temperature = 310.0_f64;
+            let mut expected_entropy = 0.0_f64;
+            let mut expected_consumed_tick = 0.0_f64;
+            let mut expected_regenerated_tick = 0.0_f64;
+            let mut expected_lifetime_consumed = 0.0_f64;
+            let mut expected_collapsed = false;
+
+            for (operation, value) in operations {
+                match operation {
+                    0 => {
+                        if value.is_finite()
+                            && value > 0.0
+                            && !expected_collapsed
+                            && expected_available > 0.0
+                            && expected_temperature.is_finite()
+                            && expected_temperature > 0.0
+                            && expected_entropy.is_finite()
+                            && expected_consumed_tick.is_finite()
+                            && expected_lifetime_consumed.is_finite()
+                        {
+                            let current = expected_available.min(max_energy);
+                            let actual = value.min(current);
+                            let next_available = current - actual;
+                            let next_consumed = expected_consumed_tick + actual;
+                            let next_lifetime = expected_lifetime_consumed + actual;
+                            let next_entropy = expected_entropy + actual / expected_temperature;
+
+                            if next_available.is_finite()
+                                && next_consumed.is_finite()
+                                && next_lifetime.is_finite()
+                                && next_entropy.is_finite()
+                            {
+                                expected_available = next_available;
+                                expected_consumed_tick = next_consumed;
+                                expected_lifetime_consumed = next_lifetime;
+                                expected_entropy = next_entropy;
+                                if expected_available <= 0.0 {
+                                    expected_available = 0.0;
+                                    expected_collapsed = true;
+                                }
+                            }
+                        }
+                        let _ = budget.consume(value);
+                    }
+                    1 => {
+                        if value.is_finite()
+                            && value > 0.0
+                            && expected_regenerated_tick.is_finite()
+                        {
+                            let current = expected_available.clamp(0.0, max_energy);
+                            let actual = value.min(max_energy - current);
+                            let next_available = current + actual;
+                            let next_regenerated = expected_regenerated_tick + actual;
+                            if next_available.is_finite() && next_regenerated.is_finite() {
+                                expected_available = next_available;
+                                expected_regenerated_tick = next_regenerated;
+                                expected_collapsed = expected_available == 0.0;
+                            }
+                        }
+                        budget.regenerate(value);
+                    }
+                    2 => {
+                        if value.is_finite()
+                            && value > 0.0
+                            && expected_temperature.is_finite()
+                            && expected_temperature > 0.0
+                        {
+                            let next_temperature = expected_temperature + value / heat_capacity;
+                            if next_temperature.is_finite() {
+                                let next_entropy = expected_entropy + value / next_temperature;
+                                if next_entropy.is_finite() {
+                                    expected_temperature = next_temperature;
+                                    expected_entropy = next_entropy;
+                                }
+                            }
+                        }
+                        budget.dissipate_heat(value);
+                    }
+                    _ => {
+                        expected_consumed_tick = 0.0;
+                        expected_regenerated_tick = 0.0;
+                        budget.tick_reset();
+                    }
+                }
+
+                prop_assert!(budget.max_energy.is_finite());
+                prop_assert!(budget.available.is_finite());
+                prop_assert!(budget.available >= 0.0);
+                prop_assert!(budget.available <= budget.max_energy);
+                prop_assert!(budget.temperature.is_finite());
+                prop_assert!(budget.temperature > 0.0);
+                prop_assert!(budget.entropy.is_finite());
+                prop_assert!(budget.consumed_this_tick.is_finite());
+                prop_assert!(budget.consumed_this_tick >= 0.0);
+                prop_assert!(budget.regenerated_this_tick.is_finite());
+                prop_assert!(budget.regenerated_this_tick >= 0.0);
+                prop_assert!(budget.lifetime_consumed.is_finite());
+                prop_assert!(budget.lifetime_consumed >= 0.0);
+                prop_assert_eq!(budget.available, expected_available);
+                prop_assert_eq!(budget.temperature, expected_temperature);
+                prop_assert_eq!(budget.entropy, expected_entropy);
+                prop_assert_eq!(budget.consumed_this_tick, expected_consumed_tick);
+                prop_assert_eq!(budget.regenerated_this_tick, expected_regenerated_tick);
+                prop_assert_eq!(budget.lifetime_consumed, expected_lifetime_consumed);
+                prop_assert_eq!(budget.is_collapsed(), expected_collapsed);
+            }
+        }
+    }
+
