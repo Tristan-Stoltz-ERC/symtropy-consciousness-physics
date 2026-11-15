@@ -435,23 +435,33 @@ impl<const D: usize> ConsciousnessField<D> {
             self.collective_phi = 0.0;
             return;
         }
-        // HashMap iteration order is randomized. Because this reduction feeds
-        // collective_phi back into later simulation inputs, an unordered sum
-        // can amplify last-bit differences into different trajectories.
-        // Sort by the stable model handle and use compensated summation.
-        let mut ordered_entities: Vec<_> = self.entities.iter().collect();
-        ordered_entities.sort_unstable_by_key(|(handle, _)| **handle);
+        #[cfg(feature = "deterministic-reductions")]
+        {
+            // HashMap iteration order is randomized. Because this reduction feeds
+            // collective_phi back into later simulation inputs, an unordered sum
+            // can amplify last-bit differences into different trajectories.
+            // Sort by the stable model handle and use compensated summation.
+            let mut ordered_entities: Vec<_> = self.entities.iter().collect();
+            ordered_entities.sort_unstable_by_key(|(handle, _)| **handle);
 
-        let mut sum = 0.0_f64;
-        let mut correction = 0.0_f64;
-        for (_, entity) in ordered_entities {
-            let value = entity.phi();
-            let adjusted = value - correction;
-            let next = sum + adjusted;
-            correction = (next - sum) - adjusted;
-            sum = next;
+            let mut sum = 0.0_f64;
+            let mut correction = 0.0_f64;
+            for (_, entity) in ordered_entities {
+                let value = entity.phi();
+                let adjusted = value - correction;
+                let next = sum + adjusted;
+                correction = (next - sum) - adjusted;
+                sum = next;
+            }
+            self.collective_phi = sum / self.entities.len() as f64;
         }
-        self.collective_phi = sum / self.entities.len() as f64;
+        #[cfg(not(feature = "deterministic-reductions"))]
+        {
+            // Preserve the historical HashMap reduction when the opt-in feature
+            // is disabled. Existing experiment output is not silently rewritten.
+            let sum: f64 = self.entities.values().map(|entity| entity.phi()).sum();
+            self.collective_phi = sum / self.entities.len() as f64;
+        }
     }
 }
 
@@ -479,14 +489,25 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     fn modulate_impulse(&self, impulse: f64, contact_point: &SVector<f64, D>) -> f64 {
         // Sanctuary zone dampening
         let mut result = impulse;
-        // The multiplication is mathematically commutative, but floating-point
-        // products depend on evaluation order. Use stable BodyHandle order so
-        // hash seeding cannot change collision impulses.
-        let mut ordered_sanctuaries: Vec<_> = self.sanctuaries.iter().collect();
-        ordered_sanctuaries.sort_unstable_by_key(|(handle, _)| **handle);
-        for (_, sanctuary) in ordered_sanctuaries {
-            let multiplier = sanctuary.impulse_multiplier(contact_point);
-            result *= multiplier;
+        #[cfg(feature = "deterministic-reductions")]
+        {
+            // The multiplication is mathematically commutative, but floating-point
+            // products depend on evaluation order. Use stable BodyHandle order so
+            // hash seeding cannot change collision impulses.
+            let mut ordered_sanctuaries: Vec<_> = self.sanctuaries.iter().collect();
+            ordered_sanctuaries.sort_unstable_by_key(|(handle, _)| **handle);
+            for (_, sanctuary) in ordered_sanctuaries {
+                let multiplier = sanctuary.impulse_multiplier(contact_point);
+                result *= multiplier;
+            }
+        }
+        #[cfg(not(feature = "deterministic-reductions"))]
+        {
+            // Preserve historical behavior unless deterministic reductions are
+            // explicitly enabled for the candidate experiment.
+            for sanctuary in self.sanctuaries.values() {
+                result *= sanctuary.impulse_multiplier(contact_point);
+            }
         }
         result
     }
@@ -588,6 +609,7 @@ mod tests {
         assert!(field.entities.get(&handle).unwrap().result.is_some());
     }
 
+    #[cfg(feature = "deterministic-reductions")]
     #[test]
     fn collective_phi_is_bitwise_stable_across_registration_orders() {
         fn build(order: &[usize]) -> ConsciousnessField<3> {
@@ -613,6 +635,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "deterministic-reductions")]
     #[test]
     fn sanctuary_impulse_product_is_bitwise_stable_across_registration_orders() {
         fn build(order: &[usize]) -> ConsciousnessField<3> {
