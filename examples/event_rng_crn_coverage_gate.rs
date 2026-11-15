@@ -37,12 +37,14 @@ enum Policy {
 }
 
 impl Policy {
+    // Keep this order aligned with evaluate_study's accumulator array:
+    // independent first, then cyclic shifts in epsilon order.
     const ALL: [Self; 5] = [
+        Self::Independent,
         Self::CyclicShift(0.01),
         Self::CyclicShift(0.025),
         Self::CyclicShift(0.1),
         Self::CyclicShift(0.25),
-        Self::Independent,
     ];
 
     fn label(self) -> &'static str {
