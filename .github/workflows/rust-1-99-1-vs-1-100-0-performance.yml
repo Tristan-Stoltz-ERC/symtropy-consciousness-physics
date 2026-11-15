@@ -52,9 +52,11 @@ jobs:
           rustup run 1.100.0 cargo -Vv
 
       - name: Run five paired fresh-target trials with Cargo timing reports
+        id: measure
         run: bash scripts/benchmark-rust-1.99.1-vs-1.100.0.sh
 
       - name: Analyse paired results with deterministic bootstrap
+        id: analyze
         shell: bash
         run: |
           set -euo pipefail
@@ -80,19 +82,40 @@ jobs:
           } | tee "$OUT/results/analysis.md" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Verify source and dependency lock are unchanged
+        if: always() && steps.measure.outcome == 'success'
         run: |
           set -euo pipefail
           git diff --exit-code -- Cargo.lock
           test -z "$(git status --porcelain -- Cargo.lock)"
 
-      - name: Upload reproducible raw evidence
+      - name: Record benchmark disposition for evidence retention
+        if: always()
+        shell: bash
+        env:
+          MEASUREMENT_OUTCOME: ${{ steps.measure.outcome }}
+          ANALYSIS_OUTCOME: ${{ steps.analyze.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RESULT_ROOT"
+          {
+            echo "schema=luminous.rust-toolchain-benchmark-job.v0.1"
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "measurement_outcome=$MEASUREMENT_OUTCOME"
+            echo "analysis_outcome=$ANALYSIS_OUTCOME"
+            echo "artifact_policy=upload_raw_measurements_even_when_analysis_rejects"
+          } > "$RESULT_ROOT/job-disposition.txt"
+
+      - name: Upload reproducible raw evidence (including rejected runs)
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: rust-1.99.1-vs-1.100.0-${{ github.sha }}
+          name: rust-1.99.1-vs-1.100.0-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
-            ${{ env.BENCHMARK_OUT }}/metadata.txt
-            ${{ env.BENCHMARK_OUT }}/toolchains
-            ${{ env.BENCHMARK_OUT }}/logs
-            ${{ env.BENCHMARK_OUT }}/results
-          if-no-files-found: error
+            benchmark-results/rust-toolchain/job-disposition.txt
+            benchmark-results/rust-toolchain/run-*/STATUS.txt
+            benchmark-results/rust-toolchain/run-*/metadata.txt
+            benchmark-results/rust-toolchain/run-*/toolchains
+            benchmark-results/rust-toolchain/run-*/logs
+            benchmark-results/rust-toolchain/run-*/results
+          if-no-files-found: warn
           retention-days: 30
