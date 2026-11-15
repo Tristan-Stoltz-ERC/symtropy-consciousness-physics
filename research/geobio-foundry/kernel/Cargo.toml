@@ -1,0 +1,12 @@
+[package]
+name = "geobio-kernel"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free reference kernels for GeoBio Foundry resource accounting"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
