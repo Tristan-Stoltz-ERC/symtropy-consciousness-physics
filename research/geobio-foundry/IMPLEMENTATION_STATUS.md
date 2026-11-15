@@ -46,6 +46,10 @@ No CI result is implied by these local/document checks. The programme remains a 
 
 The elemental uncertainty calculation uses root-sum-square and assumes independent measurement errors. Correlated uncertainty, detection limits, elemental ontology mapping, complete process heat balances, and JSON deserialization are out of scope for v0.1 and must be addressed before operational use.
 
+
+- Added `BENCHMARK_PROTOCOL_v0.1.md` with separate evidence tiers, preregistered candidate targets, baseline matrix, blind-test rules, failure dispositions, and release gates.
+- Hardened the Rust reference kernel to reject numerical overflow in aggregate elemental balances and tolerance calculations.
+
 ## Immediate next increments
 
 1. Add schema validation fixtures: valid record, missing provenance, unknown evidence state, negative mass, missing unit, and unknown origin.
