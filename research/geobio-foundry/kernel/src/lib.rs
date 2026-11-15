@@ -380,11 +380,14 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_composition_abstains_instead_of_treating_unknown_as_zero() {
+    fn incomplete_composition_abstains_for_unassayed_elements() {
         let mut process = water_electrolysis_fixture();
-        process.inputs[0].composition_complete = false;
+        process.products[0].composition_complete = false;
         let result = elemental_balance(&process, 1e-6, 3.0).unwrap();
-        assert!(result.iter().all(|entry| entry.status == BalanceStatus::Unquantified));
+        let oxygen = result.iter().find(|entry| entry.element == "O").unwrap();
+        assert_eq!(oxygen.status, BalanceStatus::Unquantified);
+        let hydrogen = result.iter().find(|entry| entry.element == "H").unwrap();
+        assert_eq!(hydrogen.status, BalanceStatus::WithinTolerance);
     }
 
     #[test]
