@@ -65,10 +65,12 @@ impl AgentMemory {
     /// Windowed reward: average energy change over window.
     /// Positive = gaining energy on average. Negative = losing.
     pub fn windowed_reward(&self) -> f64 {
-        if self.energy_window.len() < 2 { return 0.0; }
+        if self.energy_window.len() < 2 {
+            return 0.0;
+        }
         let n = self.energy_window.len();
-        let first_half: f64 = self.energy_window[..n/2].iter().sum::<f64>() / (n/2) as f64;
-        let second_half: f64 = self.energy_window[n/2..].iter().sum::<f64>() / (n - n/2) as f64;
+        let first_half: f64 = self.energy_window[..n / 2].iter().sum::<f64>() / (n / 2) as f64;
+        let second_half: f64 = self.energy_window[n / 2..].iter().sum::<f64>() / (n - n / 2) as f64;
         second_half - first_half
     }
 
@@ -89,8 +91,13 @@ impl AgentMemory {
         } else {
             if self.partner_history.len() >= self.max_partners {
                 // Evict least-encountered partner
-                if let Some(min_idx) = self.partner_history.iter().enumerate()
-                    .min_by_key(|(_, (_, _, c))| *c).map(|(i, _)| i) {
+                if let Some(min_idx) = self
+                    .partner_history
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, (_, _, c))| *c)
+                    .map(|(i, _)| i)
+                {
                     self.partner_history.swap_remove(min_idx);
                 }
             }
@@ -100,8 +107,12 @@ impl AgentMemory {
 
     /// Mean resonance with known partners.
     pub fn mean_partner_resonance(&self) -> f64 {
-        if self.partner_history.is_empty() { return 0.0; }
-        let total: f64 = self.partner_history.iter()
+        if self.partner_history.is_empty() {
+            return 0.0;
+        }
+        let total: f64 = self
+            .partner_history
+            .iter()
             .map(|(_, res, count)| if *count > 0 { res / *count as f64 } else { 0.0 })
             .sum();
         total / self.partner_history.len() as f64
@@ -263,7 +274,9 @@ impl<const D: usize> ConsciousnessField<D> {
 
     /// Drain accumulated sanctuary absorption into ledger.
     fn drain_sanctuary_absorption(&mut self) {
-        let bits = self.sanctuary_absorbed.swap(0, std::sync::atomic::Ordering::Relaxed);
+        let bits = self
+            .sanctuary_absorbed
+            .swap(0, std::sync::atomic::Ordering::Relaxed);
         let absorbed = f64::from_bits(bits);
         if absorbed > 1e-15 {
             self.ledger.record_dissipation(absorbed);
@@ -307,11 +320,7 @@ impl<const D: usize> ConsciousnessField<D> {
     /// Modulate force by consciousness level AND prediction error.
     ///
     /// Returns force × effective_motor_gain (safety tier × motor precision).
-    pub fn modulate_force(
-        &self,
-        handle: BodyHandle,
-        force: &SVector<f64, D>,
-    ) -> SVector<f64, D> {
+    pub fn modulate_force(&self, handle: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> {
         let gain = self
             .entities
             .get(&handle)
@@ -363,7 +372,8 @@ impl<const D: usize> ConsciousnessField<D> {
             let prev_bits = self.sanctuary_absorbed.load(Ordering::Relaxed);
             let prev = f64::from_bits(prev_bits);
             let new = prev + absorbed * 0.5;
-            self.sanctuary_absorbed.store(new.to_bits(), Ordering::Relaxed);
+            self.sanctuary_absorbed
+                .store(new.to_bits(), Ordering::Relaxed);
         }
         dampened
     }
@@ -435,8 +445,33 @@ impl<const D: usize> ConsciousnessField<D> {
             self.collective_phi = 0.0;
             return;
         }
-        let sum: f64 = self.entities.values().map(|e| e.phi()).sum();
-        self.collective_phi = sum / self.entities.len() as f64;
+        #[cfg(feature = "deterministic-reductions")]
+        {
+            // HashMap iteration order is randomized. Because this reduction feeds
+            // collective_phi back into later simulation inputs, an unordered sum
+            // can amplify last-bit differences into different trajectories.
+            // Sort by the stable model handle and use compensated summation.
+            let mut ordered_entities: Vec<_> = self.entities.iter().collect();
+            ordered_entities.sort_unstable_by_key(|(handle, _)| **handle);
+
+            let mut sum = 0.0_f64;
+            let mut correction = 0.0_f64;
+            for (_, entity) in ordered_entities {
+                let value = entity.phi();
+                let adjusted = value - correction;
+                let next = sum + adjusted;
+                correction = (next - sum) - adjusted;
+                sum = next;
+            }
+            self.collective_phi = sum / self.entities.len() as f64;
+        }
+        #[cfg(not(feature = "deterministic-reductions"))]
+        {
+            // Preserve the historical HashMap reduction when the opt-in feature
+            // is disabled. Existing experiment output is not silently rewritten.
+            let sum: f64 = self.entities.values().map(|entity| entity.phi()).sum();
+            self.collective_phi = sum / self.entities.len() as f64;
+        }
     }
 }
 
@@ -464,9 +499,25 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     fn modulate_impulse(&self, impulse: f64, contact_point: &SVector<f64, D>) -> f64 {
         // Sanctuary zone dampening
         let mut result = impulse;
-        for sanctuary in self.sanctuaries.values() {
-            let m = sanctuary.impulse_multiplier(contact_point);
-            result *= m;
+        #[cfg(feature = "deterministic-reductions")]
+        {
+            // The multiplication is mathematically commutative, but floating-point
+            // products depend on evaluation order. Use stable BodyHandle order so
+            // hash seeding cannot change collision impulses.
+            let mut ordered_sanctuaries: Vec<_> = self.sanctuaries.iter().collect();
+            ordered_sanctuaries.sort_unstable_by_key(|(handle, _)| **handle);
+            for (_, sanctuary) in ordered_sanctuaries {
+                let multiplier = sanctuary.impulse_multiplier(contact_point);
+                result *= multiplier;
+            }
+        }
+        #[cfg(not(feature = "deterministic-reductions"))]
+        {
+            // Preserve historical behavior unless deterministic reductions are
+            // explicitly enabled for the candidate experiment.
+            for sanctuary in self.sanctuaries.values() {
+                result *= sanctuary.impulse_multiplier(contact_point);
+            }
         }
         result
     }
@@ -486,8 +537,14 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
 
         // Compute resonance between colliding bodies for prediction error scaling
         let resonance = {
-            let harm_a = self.entities.get(&event.body_a).map(|e| e.harmony_activations);
-            let harm_b = self.entities.get(&event.body_b).map(|e| e.harmony_activations);
+            let harm_a = self
+                .entities
+                .get(&event.body_a)
+                .map(|e| e.harmony_activations);
+            let harm_b = self
+                .entities
+                .get(&event.body_b)
+                .map(|e| e.harmony_activations);
             match (harm_a, harm_b) {
                 (Some(a), Some(b)) => crate::harmony_field::HarmonyField::<D>::resonance(&a, &b),
                 _ => 0.0,
@@ -568,6 +625,108 @@ mod tests {
         assert!(field.entities.get(&handle).unwrap().result.is_some());
     }
 
+    #[cfg(feature = "deterministic-reductions")]
+    #[test]
+    fn collective_phi_is_bitwise_stable_across_registration_orders() {
+        fn build(order: &[usize]) -> ConsciousnessField<3> {
+            let mut field = ConsciousnessField::<3>::new();
+            for &index in order {
+                field.register(BodyHandle(index), 100.0, 10.0);
+            }
+
+            // Simulate the experiment's feedback path: synchrony depends on the
+            // collective value produced by the preceding update.
+            for index in 0..31 {
+                let handle = BodyHandle(index);
+                let phi = 0.07 + (index as f64) * 0.037_123_456_789;
+                let mut inputs = test_inputs(phi);
+                inputs.synchrony = field.collective_phi.max(0.5);
+                field.update_entity(handle, &inputs, symtropy_math::Point::origin());
+            }
+            field
+        }
+
+        let forward = (0..31).collect::<Vec<_>>();
+        let reverse = (0..31).rev().collect::<Vec<_>>();
+        let first = build(&forward);
+        let second = build(&forward);
+        let reversed = build(&reverse);
+
+        for handle in 0..31 {
+            assert_eq!(
+                first.phi(BodyHandle(handle)).to_bits(),
+                second.phi(BodyHandle(handle)).to_bits(),
+                "same registration order with different HashMap seeds diverged for {handle}"
+            );
+            assert_eq!(
+                first.phi(BodyHandle(handle)).to_bits(),
+                reversed.phi(BodyHandle(handle)).to_bits(),
+                "different registration order diverged for {handle}"
+            );
+        }
+        assert_eq!(
+            first.collective_phi.to_bits(),
+            second.collective_phi.to_bits()
+        );
+        assert_eq!(
+            first.collective_phi.to_bits(),
+            reversed.collective_phi.to_bits(),
+            "collective reduction must not depend on HashMap insertion/hash order"
+        );
+    }
+
+    #[cfg(feature = "deterministic-reductions")]
+    #[test]
+    fn sanctuary_impulse_product_is_bitwise_stable_across_registration_orders() {
+        fn build(order: &[usize]) -> ConsciousnessField<3> {
+            let mut field = ConsciousnessField::<3>::new();
+            for &index in order {
+                let handle = BodyHandle(index);
+                field.register(handle, 100.0, 10.0);
+                let zone = field.sanctuaries.get_mut(&handle).unwrap();
+                zone.active = true;
+                zone.radius = 10.0;
+                zone.center = symtropy_math::Point::origin();
+                zone.dampening = 0.11 + (index as f64) * 0.013_271_828_182;
+            }
+            field
+        }
+
+        let forward = (0..31).collect::<Vec<_>>();
+        let reverse = (0..31).rev().collect::<Vec<_>>();
+        let first = build(&forward);
+        let second = build(&forward);
+        let reversed = build(&reverse);
+        let contact_point = SVector::from([0.0, 0.0, 0.0]);
+
+        let first_result = <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+            &first,
+            1.0,
+            &contact_point,
+        );
+        let second_result = <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+            &second,
+            1.0,
+            &contact_point,
+        );
+        let reversed_result = <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+            &reversed,
+            1.0,
+            &contact_point,
+        );
+
+        assert_eq!(
+            first_result.to_bits(),
+            second_result.to_bits(),
+            "same insertion order with independent HashMap hash seeds diverged"
+        );
+        assert_eq!(
+            first_result.to_bits(),
+            reversed_result.to_bits(),
+            "sanctuary product must not depend on HashMap insertion/hash order"
+        );
+    }
+
     #[test]
     fn high_inputs_give_more_force_than_low() {
         let mut field = ConsciousnessField::<3>::new();
@@ -596,7 +755,8 @@ mod tests {
         assert!(
             high_force[0] >= low_force[0],
             "high inputs ({}) should give >= force than low inputs ({})",
-            high_force[0], low_force[0]
+            high_force[0],
+            low_force[0]
         );
     }
 
@@ -698,8 +858,16 @@ mod tests {
         field.register(BodyHandle(0), 100.0, 10.0);
         field.register(BodyHandle(1), 100.0, 10.0);
 
-        field.update_entity(BodyHandle(0), &test_inputs(0.9), symtropy_math::Point::origin());
-        field.update_entity(BodyHandle(1), &test_inputs(0.9), symtropy_math::Point::origin());
+        field.update_entity(
+            BodyHandle(0),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
+        field.update_entity(
+            BodyHandle(1),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
 
         // Both entities have some consciousness
         assert!(field.collective_phi > 0.0);
@@ -713,7 +881,11 @@ mod tests {
         assert!((field.resource_regeneration_multiplier() - 0.5).abs() < 1e-10);
 
         field.register(BodyHandle(0), 100.0, 10.0);
-        field.update_entity(BodyHandle(0), &test_inputs(0.9), symtropy_math::Point::origin());
+        field.update_entity(
+            BodyHandle(0),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
 
         // With consciousness → regen > 0.5
         assert!(field.resource_regeneration_multiplier() > 0.5);
@@ -740,12 +912,7 @@ mod tests {
 
         for &phi in &levels {
             field.update_entity(h, &test_inputs(phi), symtropy_math::Point::origin());
-            let gain = field
-                .entities
-                .get(&h)
-                .unwrap()
-                .safety_tier
-                .motor_gain();
+            let gain = field.entities.get(&h).unwrap().safety_tier.motor_gain();
             assert!(
                 gain >= prev_gain,
                 "phi={phi} gave gain={gain} < prev={prev_gain}"
