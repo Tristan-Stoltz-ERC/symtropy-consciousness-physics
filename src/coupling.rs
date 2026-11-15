@@ -631,10 +631,17 @@ mod tests {
         fn build(order: &[usize]) -> ConsciousnessField<3> {
             let mut field = ConsciousnessField::<3>::new();
             for &index in order {
+                field.register(BodyHandle(index), 100.0, 10.0);
+            }
+
+            // Simulate the experiment's feedback path: synchrony depends on the
+            // collective value produced by the preceding update.
+            for index in 0..31 {
                 let handle = BodyHandle(index);
-                field.register(handle, 100.0, 10.0);
                 let phi = 0.07 + (index as f64) * 0.037_123_456_789;
-                field.update_entity(handle, &test_inputs(phi), symtropy_math::Point::origin());
+                let mut inputs = test_inputs(phi);
+                inputs.synchrony = field.collective_phi.max(0.5);
+                field.update_entity(handle, &inputs, symtropy_math::Point::origin());
             }
             field
         }
@@ -642,11 +649,28 @@ mod tests {
         let forward = (0..31).collect::<Vec<_>>();
         let reverse = (0..31).rev().collect::<Vec<_>>();
         let first = build(&forward);
-        let second = build(&reverse);
+        let second = build(&forward);
+        let reversed = build(&reverse);
 
+        for handle in 0..31 {
+            assert_eq!(
+                first.phi(BodyHandle(handle)).to_bits(),
+                second.phi(BodyHandle(handle)).to_bits(),
+                "same registration order with different HashMap seeds diverged for {handle}"
+            );
+            assert_eq!(
+                first.phi(BodyHandle(handle)).to_bits(),
+                reversed.phi(BodyHandle(handle)).to_bits(),
+                "different registration order diverged for {handle}"
+            );
+        }
         assert_eq!(
             first.collective_phi.to_bits(),
-            second.collective_phi.to_bits(),
+            second.collective_phi.to_bits()
+        );
+        assert_eq!(
+            first.collective_phi.to_bits(),
+            reversed.collective_phi.to_bits(),
             "collective reduction must not depend on HashMap insertion/hash order"
         );
     }
@@ -671,15 +695,37 @@ mod tests {
         let forward = (0..31).collect::<Vec<_>>();
         let reverse = (0..31).rev().collect::<Vec<_>>();
         let first = build(&forward);
-        let second = build(&reverse);
+        let second = build(&forward);
+        let reversed = build(&reverse);
         let contact_point = SVector::from([0.0, 0.0, 0.0]);
 
-        let first_result = first.modulate_impulse(1.0, &contact_point);
-        let second_result = second.modulate_impulse(1.0, &contact_point);
+        let first_result =
+            <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+                &first,
+                1.0,
+                &contact_point,
+            );
+        let second_result =
+            <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+                &second,
+                1.0,
+                &contact_point,
+            );
+        let reversed_result =
+            <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+                &reversed,
+                1.0,
+                &contact_point,
+            );
 
         assert_eq!(
             first_result.to_bits(),
             second_result.to_bits(),
+            "same insertion order with independent HashMap hash seeds diverged"
+        );
+        assert_eq!(
+            first_result.to_bits(),
+            reversed_result.to_bits(),
             "sanctuary product must not depend on HashMap insertion/hash order"
         );
     }
