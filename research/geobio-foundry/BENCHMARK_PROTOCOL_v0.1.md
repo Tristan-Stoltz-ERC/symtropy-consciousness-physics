@@ -47,14 +47,15 @@ Every benchmark should compare against the strongest relevant baseline available
 
 | Problem | Minimum baseline set |
 |---|---|
-| Geological reconstruction | Classical photogrammetry/LiDAR/GPR processing; point-cloud registration; conventional Bayesian mapping |
+| Geological reconstruction | Classical photogrammetry/LiDAR/GPR processing; point-cloud registration; conventional Bayesian mapping; NASA CADRE cooperative mapping/GPR where comparable |
 | Geomechanics | Analytical rock mechanics where applicable; conventional deterministic FEM; stochastic/reliability analysis where available |
 | Pressure systems | Standard pressure-vessel design methods; conventional leak detection and safety instrumented logic |
-| Regolith processing | Published NASA MRE/carbothermal demonstrations; matched abiotic processing; measured process energy and product purity |
+| Regolith processing | NASA MRE and CaRD; Blue Alchemist's reported integrated regolith-to-products prototype; matched abiotic processing; measured process energy and product purity |
 | Bioleaching | Matched abiotic leach; organism-only and medium controls; published BioAsteroid conditions where reproducible |
 | Bioreactor control | Well-mixed process model; conventional PID/MPC; multiscale CFD/physiology model where data permit |
-| Asteroid robotics | Mission-heritage contact concepts; short-contact/rapid-retreat baseline; independent contact-dynamics model |
+| Asteroid robotics | Mission-heritage contact concepts; short-contact/rapid-retreat baseline; integrated mobility/sampling/anchoring review; independent contact-dynamics model |
 | Autonomy | Deterministic state machine; conventional fault detection and recovery; learning-enabled planner with safety shield |
+| Robotic construction / excavation | NASA ARMADAS modular voxel assembly and IPEx excavation design target as architectural/throughput references; match mass, geometry and test tier |
 | Resource allocation | Greedy and linear-programming baselines; robust optimization under uncertainty |
 | Evidence verification | Cryptographic provenance checks plus deliberately forged/stale/replayed negative controls |
 
