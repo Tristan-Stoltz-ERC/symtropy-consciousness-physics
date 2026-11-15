@@ -65,6 +65,7 @@ name = "event_rng_joint_coupling_portfolio"
 path = "examples/event_rng_joint_coupling_portfolio.rs"
 
 # Coverage-gated selector for rare-tail cyclic-shift CRN policies.
+# Policy order in the example is independent baseline, then ascending jitter.
 [[example]]
 name = "event_rng_crn_coverage_gate"
 path = "examples/event_rng_crn_coverage_gate.rs"
