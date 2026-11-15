@@ -65,10 +65,12 @@ impl AgentMemory {
     /// Windowed reward: average energy change over window.
     /// Positive = gaining energy on average. Negative = losing.
     pub fn windowed_reward(&self) -> f64 {
-        if self.energy_window.len() < 2 { return 0.0; }
+        if self.energy_window.len() < 2 {
+            return 0.0;
+        }
         let n = self.energy_window.len();
-        let first_half: f64 = self.energy_window[..n/2].iter().sum::<f64>() / (n/2) as f64;
-        let second_half: f64 = self.energy_window[n/2..].iter().sum::<f64>() / (n - n/2) as f64;
+        let first_half: f64 = self.energy_window[..n / 2].iter().sum::<f64>() / (n / 2) as f64;
+        let second_half: f64 = self.energy_window[n / 2..].iter().sum::<f64>() / (n - n / 2) as f64;
         second_half - first_half
     }
 
@@ -89,8 +91,13 @@ impl AgentMemory {
         } else {
             if self.partner_history.len() >= self.max_partners {
                 // Evict least-encountered partner
-                if let Some(min_idx) = self.partner_history.iter().enumerate()
-                    .min_by_key(|(_, (_, _, c))| *c).map(|(i, _)| i) {
+                if let Some(min_idx) = self
+                    .partner_history
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, (_, _, c))| *c)
+                    .map(|(i, _)| i)
+                {
                     self.partner_history.swap_remove(min_idx);
                 }
             }
@@ -100,8 +107,12 @@ impl AgentMemory {
 
     /// Mean resonance with known partners.
     pub fn mean_partner_resonance(&self) -> f64 {
-        if self.partner_history.is_empty() { return 0.0; }
-        let total: f64 = self.partner_history.iter()
+        if self.partner_history.is_empty() {
+            return 0.0;
+        }
+        let total: f64 = self
+            .partner_history
+            .iter()
             .map(|(_, res, count)| if *count > 0 { res / *count as f64 } else { 0.0 })
             .sum();
         total / self.partner_history.len() as f64
@@ -263,7 +274,9 @@ impl<const D: usize> ConsciousnessField<D> {
 
     /// Drain accumulated sanctuary absorption into ledger.
     fn drain_sanctuary_absorption(&mut self) {
-        let bits = self.sanctuary_absorbed.swap(0, std::sync::atomic::Ordering::Relaxed);
+        let bits = self
+            .sanctuary_absorbed
+            .swap(0, std::sync::atomic::Ordering::Relaxed);
         let absorbed = f64::from_bits(bits);
         if absorbed > 1e-15 {
             self.ledger.record_dissipation(absorbed);
@@ -307,11 +320,7 @@ impl<const D: usize> ConsciousnessField<D> {
     /// Modulate force by consciousness level AND prediction error.
     ///
     /// Returns force × effective_motor_gain (safety tier × motor precision).
-    pub fn modulate_force(
-        &self,
-        handle: BodyHandle,
-        force: &SVector<f64, D>,
-    ) -> SVector<f64, D> {
+    pub fn modulate_force(&self, handle: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> {
         let gain = self
             .entities
             .get(&handle)
@@ -363,7 +372,8 @@ impl<const D: usize> ConsciousnessField<D> {
             let prev_bits = self.sanctuary_absorbed.load(Ordering::Relaxed);
             let prev = f64::from_bits(prev_bits);
             let new = prev + absorbed * 0.5;
-            self.sanctuary_absorbed.store(new.to_bits(), Ordering::Relaxed);
+            self.sanctuary_absorbed
+                .store(new.to_bits(), Ordering::Relaxed);
         }
         dampened
     }
@@ -527,8 +537,14 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
 
         // Compute resonance between colliding bodies for prediction error scaling
         let resonance = {
-            let harm_a = self.entities.get(&event.body_a).map(|e| e.harmony_activations);
-            let harm_b = self.entities.get(&event.body_b).map(|e| e.harmony_activations);
+            let harm_a = self
+                .entities
+                .get(&event.body_a)
+                .map(|e| e.harmony_activations);
+            let harm_b = self
+                .entities
+                .get(&event.body_b)
+                .map(|e| e.harmony_activations);
             match (harm_a, harm_b) {
                 (Some(a), Some(b)) => crate::harmony_field::HarmonyField::<D>::resonance(&a, &b),
                 _ => 0.0,
@@ -696,7 +712,8 @@ mod tests {
         assert!(
             high_force[0] >= low_force[0],
             "high inputs ({}) should give >= force than low inputs ({})",
-            high_force[0], low_force[0]
+            high_force[0],
+            low_force[0]
         );
     }
 
@@ -798,8 +815,16 @@ mod tests {
         field.register(BodyHandle(0), 100.0, 10.0);
         field.register(BodyHandle(1), 100.0, 10.0);
 
-        field.update_entity(BodyHandle(0), &test_inputs(0.9), symtropy_math::Point::origin());
-        field.update_entity(BodyHandle(1), &test_inputs(0.9), symtropy_math::Point::origin());
+        field.update_entity(
+            BodyHandle(0),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
+        field.update_entity(
+            BodyHandle(1),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
 
         // Both entities have some consciousness
         assert!(field.collective_phi > 0.0);
