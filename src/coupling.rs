@@ -699,24 +699,21 @@ mod tests {
         let reversed = build(&reverse);
         let contact_point = SVector::from([0.0, 0.0, 0.0]);
 
-        let first_result =
-            <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
-                &first,
-                1.0,
-                &contact_point,
-            );
-        let second_result =
-            <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
-                &second,
-                1.0,
-                &contact_point,
-            );
-        let reversed_result =
-            <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
-                &reversed,
-                1.0,
-                &contact_point,
-            );
+        let first_result = <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+            &first,
+            1.0,
+            &contact_point,
+        );
+        let second_result = <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+            &second,
+            1.0,
+            &contact_point,
+        );
+        let reversed_result = <ConsciousnessField<3> as PhysicsCallback<3>>::modulate_impulse(
+            &reversed,
+            1.0,
+            &contact_point,
+        );
 
         assert_eq!(
             first_result.to_bits(),
