@@ -11,9 +11,7 @@
 
 use std::process;
 
-use symtropy_consciousness_physics::event_rng::{
-    registry, EventAddress, SubjectId,
-};
+use symtropy_consciousness_physics::event_rng::{registry, EventAddress, SubjectId};
 
 const TRAIN_STUDIES: usize = 5_000;
 const HOLDOUT_STUDIES: usize = 5_000;
@@ -103,15 +101,13 @@ impl Moments {
     }
 
     fn normal_interval_contains_zero(self) -> bool {
-        let standard_error =
-            (self.sample_variance() / OBSERVATIONS_PER_STUDY as f64).sqrt();
+        let standard_error = (self.sample_variance() / OBSERVATIONS_PER_STUDY as f64).sqrt();
         let half_width = NORMAL_CRITICAL * standard_error;
         self.mean - half_width <= 0.0 && self.mean + half_width >= 0.0
     }
 
     fn normal_interval_width(self) -> f64 {
-        2.0 * NORMAL_CRITICAL
-            * (self.sample_variance() / OBSERVATIONS_PER_STUDY as f64).sqrt()
+        2.0 * NORMAL_CRITICAL * (self.sample_variance() / OBSERVATIONS_PER_STUDY as f64).sqrt()
     }
 }
 
@@ -157,9 +153,8 @@ impl StudyAggregate {
         let z2 = NORMAL_CRITICAL * NORMAL_CRITICAL;
         let denominator = 1.0 + z2 / n;
         let center = (p + z2 / (2.0 * n)) / denominator;
-        let radius = NORMAL_CRITICAL
-            * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
-            / denominator;
+        let radius =
+            NORMAL_CRITICAL * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
         ((center - radius).max(0.0), (center + radius).min(1.0))
     }
 }
@@ -168,11 +163,7 @@ fn seed_for(study_index: usize) -> u64 {
     ROOT_SEED.wrapping_add((study_index as u64).wrapping_mul(SEED_STRIDE))
 }
 
-fn event_stream(
-    seed: u64,
-    namespace: u64,
-    subject: SubjectId,
-) -> impl Iterator<Item = f64> {
+fn event_stream(seed: u64, namespace: u64, subject: SubjectId) -> impl Iterator<Item = f64> {
     EventAddress::new(
         seed,
         namespace,
@@ -191,8 +182,8 @@ fn cyclic_shift_delta(control: f64, jitter: f64, epsilon: f64) -> f64 {
 
 fn evaluate_study(study_index: usize) -> [Moments; 5] {
     let seed = seed_for(study_index);
-    let subject = SubjectId::agent((study_index as u32) + 1)
-        .expect("meta-study subject IDs are nonzero");
+    let subject =
+        SubjectId::agent((study_index as u32) + 1).expect("meta-study subject IDs are nonzero");
 
     let mut control_stream = event_stream(seed, BASE_NAMESPACE, subject);
     let mut independent_stream = event_stream(seed, INDEPENDENT_NAMESPACE, subject);
@@ -201,7 +192,9 @@ fn evaluate_study(study_index: usize) -> [Moments; 5] {
     let mut accumulators = [Moments::default(); 5];
 
     for _ in 0..OBSERVATIONS_PER_STUDY {
-        let control = control_stream.next().expect("control stream is long enough");
+        let control = control_stream
+            .next()
+            .expect("control stream is long enough");
         let independent = independent_stream
             .next()
             .expect("independent stream is long enough");
@@ -267,11 +260,7 @@ fn aggregate_for<'a>(
     &aggregates[index]
 }
 
-fn print_partition(
-    label: &str,
-    aggregates: &[StudyAggregate; 5],
-    independent_variance: f64,
-) {
+fn print_partition(label: &str, aggregates: &[StudyAggregate; 5], independent_variance: f64) {
     for (policy, aggregate) in Policy::ALL.into_iter().zip(aggregates.iter().copied()) {
         let (lower, upper) = aggregate.coverage_wilson_95();
         println!(
@@ -308,12 +297,8 @@ fn main() {
     println!("variance_theory=independent:1/6;cyclic_shift:epsilon/2-epsilon^2/3");
 
     let training = evaluate_partition(0, TRAIN_STUDIES);
-    let independent_training_variance = aggregate_for(
-        &Policy::ALL,
-        &training,
-        Policy::Independent,
-    )
-    .mean_sample_variance();
+    let independent_training_variance =
+        aggregate_for(&Policy::ALL, &training, Policy::Independent).mean_sample_variance();
     print_partition("training", &training, independent_training_variance);
 
     let variance_only = choose_variance_only(&training);
@@ -321,20 +306,14 @@ fn main() {
         .expect("the independent policy should pass the preregistered coverage gate");
 
     let holdout = evaluate_partition(TRAIN_STUDIES, HOLDOUT_STUDIES);
-    let independent_holdout_variance = aggregate_for(
-        &Policy::ALL,
-        &holdout,
-        Policy::Independent,
-    )
-    .mean_sample_variance();
+    let independent_holdout_variance =
+        aggregate_for(&Policy::ALL, &holdout, Policy::Independent).mean_sample_variance();
     print_partition("holdout", &holdout, independent_holdout_variance);
 
     let variance_only_holdout = aggregate_for(&Policy::ALL, &holdout, variance_only);
     let gated_holdout = aggregate_for(&Policy::ALL, &holdout, coverage_gated);
-    let (gated_coverage_lower, gated_coverage_upper) =
-        gated_holdout.coverage_wilson_95();
-    let (variance_only_lower, variance_only_upper) =
-        variance_only_holdout.coverage_wilson_95();
+    let (gated_coverage_lower, gated_coverage_upper) = gated_holdout.coverage_wilson_95();
+    let (variance_only_lower, variance_only_upper) = variance_only_holdout.coverage_wilson_95();
 
     println!(
         "COVERAGE_GATE_SELECTION_JSON={{\"schema\":\"luminous.symtropy.crn-coverage-gate-selection.v0.1\",\"variance_only_choice\":\"{}\",\"coverage_gated_choice\":\"{}\",\"coverage_floor\":{:.4},\"variance_only_holdout_coverage\":{:.8},\"variance_only_holdout_wilson_95\":[{:.8},{:.8}],\"variance_only_holdout_variance_ratio\":{:.8},\"gated_holdout_coverage\":{:.8},\"gated_holdout_wilson_95\":[{:.8},{:.8}],\"gated_holdout_variance_ratio\":{:.8}}}",
@@ -354,8 +333,8 @@ fn main() {
     let variance_only_is_rare_tail = variance_only == Policy::CyclicShift(0.01);
     let gated_holdout_is_calibrated = gated_coverage_lower > COVERAGE_FLOOR;
     let variance_only_holdout_is_miscalibrated = variance_only_upper < COVERAGE_FLOOR;
-    let gated_reduces_variance = gated_holdout.mean_sample_variance()
-        < independent_holdout_variance * 0.8;
+    let gated_reduces_variance =
+        gated_holdout.mean_sample_variance() < independent_holdout_variance * 0.8;
 
     if variance_only_is_rare_tail
         && gated_holdout_is_calibrated
@@ -401,7 +380,9 @@ mod tests {
 
     #[test]
     fn training_and_holdout_meta_study_seeds_are_disjoint() {
-        let training = (0..TRAIN_STUDIES).map(seed_for).collect::<std::collections::HashSet<_>>();
+        let training = (0..TRAIN_STUDIES)
+            .map(seed_for)
+            .collect::<std::collections::HashSet<_>>();
         let holdout = (TRAIN_STUDIES..TRAIN_STUDIES + HOLDOUT_STUDIES)
             .map(seed_for)
             .collect::<std::collections::HashSet<_>>();
@@ -412,8 +393,12 @@ mod tests {
     fn event_streams_are_repeatable_and_namespace_separated() {
         let seed = seed_for(3);
         let subject = SubjectId::agent(4).unwrap();
-        let first = event_stream(seed, BASE_NAMESPACE, subject).take(12).collect::<Vec<_>>();
-        let repeated = event_stream(seed, BASE_NAMESPACE, subject).take(12).collect::<Vec<_>>();
+        let first = event_stream(seed, BASE_NAMESPACE, subject)
+            .take(12)
+            .collect::<Vec<_>>();
+        let repeated = event_stream(seed, BASE_NAMESPACE, subject)
+            .take(12)
+            .collect::<Vec<_>>();
         let independent = event_stream(seed, INDEPENDENT_NAMESPACE, subject)
             .take(12)
             .collect::<Vec<_>>();
