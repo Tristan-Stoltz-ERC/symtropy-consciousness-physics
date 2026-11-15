@@ -155,6 +155,7 @@ fn record(
         selected_candidate,
         admissible,
         admissible,
+        admissible,
         REPLICATES_PER_PARTITION,
         REPLICATES_PER_PARTITION,
         training_variance,
