@@ -1,0 +1,57 @@
+{
+  "schema": "luminous.symtropy.joint-coupling-portfolio.v0.1",
+  "status": "synthetic_analytic_fixture",
+  "estimand": "ATE",
+  "primitives": "two_independent_Uniform_0_1_event_families",
+  "arm_outcomes": {
+    "control": "U - V",
+    "treatment": "-U_prime + V_prime"
+  },
+  "training_replicates": 8192,
+  "holdout_replicates": 8192,
+  "seed_partition": {
+    "training": "[0,8192)",
+    "holdout": "[8192,16384)"
+  },
+  "candidate_policies": [
+    {
+      "name": "independent",
+      "admissible_without_exchangeability": true,
+      "theoretical_variance": 0.3333333333333333
+    },
+    {
+      "name": "same_event_identity",
+      "admissible_without_exchangeability": true,
+      "theoretical_variance": 0.6666666666666666
+    },
+    {
+      "name": "antithetic",
+      "admissible_without_exchangeability": true,
+      "theoretical_variance": 0
+    },
+    {
+      "name": "cross_family_swap",
+      "admissible_only_when_exchangeable": true,
+      "theoretical_variance": 0
+    }
+  ],
+  "same_family_identity_covariance": {
+    "family_a": -0.08333333333333333,
+    "family_b": -0.08333333333333333
+  },
+  "local_sign_selector": "independent",
+  "cross_family_swap_requires_explicit_exchangeability": true,
+  "marginal_preservation": {
+    "independent": "independent_uniform_streams",
+    "same_event_identity": "reuse_same_uniform_pair",
+    "antithetic": "coordinatewise_uniform_complement",
+    "cross_family_swap": "permutation_of_iid_uniform_coordinates"
+  },
+  "claims_not_established": [
+    "real_model_semantic_admissibility",
+    "general_coupling_optimality",
+    "universal_variance_reduction",
+    "physical_social_or_consciousness_validity",
+    "rng_statistical_battery_qualification"
+  ]
+}
