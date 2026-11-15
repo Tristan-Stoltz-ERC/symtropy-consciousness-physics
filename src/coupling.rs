@@ -838,7 +838,11 @@ mod tests {
         assert!((field.resource_regeneration_multiplier() - 0.5).abs() < 1e-10);
 
         field.register(BodyHandle(0), 100.0, 10.0);
-        field.update_entity(BodyHandle(0), &test_inputs(0.9), symtropy_math::Point::origin());
+        field.update_entity(
+            BodyHandle(0),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
 
         // With consciousness → regen > 0.5
         assert!(field.resource_regeneration_multiplier() > 0.5);
@@ -865,12 +869,7 @@ mod tests {
 
         for &phi in &levels {
             field.update_entity(h, &test_inputs(phi), symtropy_math::Point::origin());
-            let gain = field
-                .entities
-                .get(&h)
-                .unwrap()
-                .safety_tier
-                .motor_gain();
+            let gain = field.entities.get(&h).unwrap().safety_tier.motor_gain();
             assert!(
                 gain >= prev_gain,
                 "phi={phi} gave gain={gain} < prev={prev_gain}"
