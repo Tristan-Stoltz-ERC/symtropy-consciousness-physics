@@ -53,5 +53,10 @@
     "universal_variance_reduction",
     "physical_social_or_consciousness_validity",
     "rng_statistical_battery_qualification"
-  ]
+  ],
+  "admissibility_receipt": {
+    "marginal_preservation": "reported independently of semantic admissibility",
+    "semantic_admissibility": "requires explicit exchangeability for cross_family_swap",
+    "selection_eligibility": "false whenever semantic admissibility is false"
+  }
 }
