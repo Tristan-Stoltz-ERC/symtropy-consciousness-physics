@@ -150,7 +150,7 @@ fn record(
     theoretical_variance: f64,
 ) {
     println!(
-        "JOINT_COUPLING_JSON={{\"schema\":\"luminous.symtropy.joint-coupling-portfolio.v0.1\",\"policy\":\"{}\",\"selected_candidate\":\"{}\",\"admissible\":{},\"marginals_preserved\":{},\"training_replicates\":{},\"holdout_replicates\":{},\"training_variance\":{:.12e},\"holdout_mean_difference\":{:.12e},\"holdout_variance\":{:.12e},\"variance_ratio_to_independent\":{:.12e},\"theoretical_variance\":{:.12e},\"same_family_identity_covariance_a\":{:.12e},\"same_family_identity_covariance_b\":{:.12e},\"local_sign_selector\":\"independent\"}}",
+        "JOINT_COUPLING_JSON={{\"schema\":\"luminous.symtropy.joint-coupling-portfolio.v0.1\",\"policy\":\"{}\",\"selected_candidate\":\"{}\",\"admissible\":{},\"marginals_preserved\":true,\"semantically_admissible\":{},\"eligible_for_selection\":{},\"training_replicates\":{},\"holdout_replicates\":{},\"training_variance\":{:.12e},\"holdout_mean_difference\":{:.12e},\"holdout_variance\":{:.12e},\"variance_ratio_to_independent\":{:.12e},\"theoretical_variance\":{:.12e},\"same_family_identity_covariance_a\":{:.12e},\"same_family_identity_covariance_b\":{:.12e},\"local_sign_selector\":\"independent\"}}",
         label,
         selected_candidate,
         admissible,
@@ -244,7 +244,7 @@ fn run_suite(families_exchangeable: bool) -> bool {
 
     if !families_exchangeable {
         println!(
-            "JOINT_COUPLING_JSON={{\"schema\":\"luminous.symtropy.joint-coupling-portfolio.v0.1\",\"policy\":\"cross_family_swap\",\"selected_candidate\":\"\",\"admissible\":false,\"marginals_preserved\":false,\"reason\":\"event_families_not_declared_exchangeable\",\"training_replicates\":{},\"holdout_replicates\":{}}}",
+            "JOINT_COUPLING_JSON={{\"schema\":\"luminous.symtropy.joint-coupling-portfolio.v0.1\",\"policy\":\"cross_family_swap\",\"selected_candidate\":\"\",\"admissible\":false,\"marginals_preserved\":true,\"semantically_admissible\":false,\"eligible_for_selection\":false,\"reason\":\"event_families_not_declared_exchangeable\",\"training_replicates\":{},\"holdout_replicates\":{}}}",
             REPLICATES_PER_PARTITION,
             REPLICATES_PER_PARTITION
         );
