@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/geobio/resource-flow/v0.1",
+  "title": "GeoBio Resource Flow Record",
+  "description": "Evidence-aware record for a bounded resource transformation. This schema records claims; it does not certify physical availability or process safety.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_id", "process_id", "functional_unit", "evidence_state", "inputs", "outputs", "energy", "provenance"],
+  "properties": {
+    "record_id": {"type": "string", "minLength": 1},
+    "process_id": {"type": "string", "minLength": 1},
+    "functional_unit": {"type": "string", "minLength": 1},
+    "evidence_state": {"$ref": "#/$defs/evidenceState"},
+    "inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/materialFlow"}},
+    "outputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/materialFlow"}},
+    "energy": {"$ref": "#/$defs/energy"},
+    "water": {"oneOf": [{"$ref": "#/$defs/quantity"}, {"type": "null"}]},
+    "operating_duration_seconds": {"type": ["number", "null"], "exclusiveMinimum": 0},
+    "waste_streams": {"type": "array", "items": {"$ref": "#/$defs/materialFlow"}, "default": []},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "notes": {"type": "string"}
+  },
+  "$defs": {
+    "evidenceState": {
+      "type": "string",
+      "enum": ["assumed", "modelled", "measured", "independently_reproduced", "qualified"]
+    },
+    "basis": {
+      "type": "string",
+      "enum": ["assumed", "literature", "modelled", "measured", "independently_verified"]
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit", "basis"],
+      "properties": {
+        "value": {"type": "number", "minimum": 0},
+        "standard_uncertainty": {"type": ["number", "null"], "minimum": 0},
+        "unit": {"type": "string", "minLength": 1},
+        "basis": {"$ref": "#/$defs/basis"}
+      }
+    },
+    "materialFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["material_id", "mass", "origin_class"],
+      "properties": {
+        "material_id": {"type": "string", "minLength": 1},
+        "mass": {"$ref": "#/$defs/quantity"},
+        "origin_class": {"type": "string", "enum": ["local_measured", "local_inferred", "imported", "recycled", "unknown"]},
+        "batch_id": {"type": ["string", "null"]},
+        "composition_reference": {"type": ["string", "null"]}
+      }
+    },
+    "energy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consumed"],
+      "properties": {
+        "consumed": {"$ref": "#/$defs/quantity"},
+        "recovered": {"oneOf": [{"$ref": "#/$defs/quantity"}, {"type": "null"}]},
+        "source_class": {"type": "string", "enum": ["solar", "nuclear", "stored", "external_grid", "unknown"]}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created_at", "producer", "method_id", "input_digest"],
+      "properties": {
+        "created_at": {"type": "string", "format": "date-time"},
+        "producer": {"type": "string", "minLength": 1},
+        "method_id": {"type": "string", "minLength": 1},
+        "input_digest": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+        "model_digest": {"type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$"},
+        "independent_witness": {"type": ["string", "null"]},
+        "valid_until": {"type": ["string", "null"], "format": "date-time"}
+      }
+    }
+  }
+}
