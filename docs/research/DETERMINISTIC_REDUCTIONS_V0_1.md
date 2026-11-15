@@ -30,8 +30,9 @@ The dedicated workflow:
 - builds cooperation_decomposition once with the feature enabled;
 - executes the exact same binary five times in fresh processes;
 - captures stdout and stderr separately;
-- requires byte-identical stdout across all five executions;
-- uploads raw outputs and checksums even when the determinism assertion fails.
+- requires byte-identical stdout and stderr across all five executions;
+- uploads raw outputs and checksums even when the determinism assertion fails;
+- runs both the historical default feature set and the opt-in deterministic feature set on every qualified toolchain.
 
 This establishes same-host, same-binary process repeatability for this one executable. It does not prove cross-architecture bitwise reproducibility, physical model validity, or compiler-wide determinism.
 
