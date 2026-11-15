@@ -25,7 +25,10 @@
       "stdout_bytes",
       "stderr_bytes"
     ],
-    "normalize_output": false
+    "normalize_output": false,
+    "ci_repetitions": 5,
+    "ci_seed_partition": "[0,2)",
+    "upload_raw_on_failure": true
   },
   "qualification_toolchains": [
     "1.99.1",
@@ -38,5 +41,9 @@
     "cross_architecture_bitwise_reproducibility",
     "performance_improvement",
     "zero_overhead"
+  ],
+  "test_modes": [
+    "default_features",
+    "deterministic_reductions_feature"
   ]
 }
