@@ -1,0 +1,74 @@
+name: Joint event-coupling portfolio qualification
+
+on:
+  pull_request:
+    branches: [research/crn-event-family-portfolio-v0.1]
+    paths:
+      - 'Cargo.toml'
+      - 'examples/event_rng_joint_coupling_portfolio.rs'
+      - 'docs/research/JOINT_EVENT_COUPLING_PORTFOLIO_V0_1.md'
+      - 'docs/research/contracts/joint-coupling-portfolio.v0.1.json'
+      - '.github/workflows/joint-event-coupling-portfolio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Rust ${{ matrix.toolchain }} — joint coupling portfolio
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ['1.99.1', '1.100.0', '1.101.0-beta.1']
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact toolchain and rustfmt
+        shell: bash
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install "$TOOLCHAIN" --profile minimal --component rustfmt
+          rustc "+$TOOLCHAIN" -vV
+          cargo "+$TOOLCHAIN" -Vv
+          rustc "+$TOOLCHAIN" --version | grep -F "rustc $TOOLCHAIN"
+
+      - name: Format the joint coupling benchmark
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
+        run: rustfmt "+$TOOLCHAIN" --check examples/event_rng_joint_coupling_portfolio.rs
+
+      - name: Test coupling algebra, admissibility and cross-fitting
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo "+$TOOLCHAIN" test --locked --example event_rng_joint_coupling_portfolio
+
+      - name: Run pilot-selected coupling portfolio
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
+        run: cargo "+$TOOLCHAIN" run --locked --example event_rng_joint_coupling_portfolio | tee "$RUNNER_TEMP/joint-coupling.txt"
+
+      - name: Validate machine-readable receipts against contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.schema == "luminous.symtropy.joint-coupling-portfolio.v0.1" and .training_replicates == 8192 and .holdout_replicates == 8192' docs/research/contracts/joint-coupling-portfolio.v0.1.json
+          mapfile -t records < <(grep '^JOINT_COUPLING_JSON=' "$RUNNER_TEMP/joint-coupling.txt" | sed 's/^JOINT_COUPLING_JSON=//')
+          [[ "${#records[@]}" -eq 12 ]]
+          for record in "${records[@]}"; do
+            jq -e '.schema == "luminous.symtropy.joint-coupling-portfolio.v0.1"' <<< "$record" >/dev/null
+          done
+          swap_allowed="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "cross_family_swap" and .admissible == true and .marginals_preserved == true and .semantically_admissible == true and .eligible_for_selection == true)] | length')"
+          swap_rejected="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "cross_family_swap" and .admissible == false and .marginals_preserved == true and .semantically_admissible == false and .eligible_for_selection == false)] | length')"
+          selected_count="$(printf '%s\n' "${records[@]}" | jq -s '[.[] | select(.policy == "pilot_selected")] | length')"
+          [[ "$swap_allowed" -eq 1 && "$swap_rejected" -eq 1 && "$selected_count" -eq 2 ]]
+          grep -q '^benchmark_status=PASS$' "$RUNNER_TEMP/joint-coupling.txt"
+          printf 'PASS: coupling receipts, pilot/holdout separation, and exchangeability gate match contract\n'

@@ -58,3 +58,8 @@ path = "examples/event_rng_crn_crossfit.rs"
 [[example]]
 name = "event_rng_crn_event_family_portfolio"
 path = "examples/event_rng_crn_event_family_portfolio.rs"
+
+# Joint event-coupling candidate portfolio with explicit admissibility constraints.
+[[example]]
+name = "event_rng_joint_coupling_portfolio"
+path = "examples/event_rng_joint_coupling_portfolio.rs"
