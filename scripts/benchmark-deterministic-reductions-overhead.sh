@@ -49,7 +49,7 @@ CARGO_VERSION="$(rustup run "$TOOLCHAIN" cargo --version)"
 rustup run "$TOOLCHAIN" rustc -Vv > "$OUT/rustc-version.txt"
 rustup run "$TOOLCHAIN" cargo -Vv > "$OUT/cargo-version.txt"
 git rev-parse HEAD > "$OUT/source-commit.txt"
-sha256sum Cargo.lock src/coupling.rs examples/cooperation_decomposition.rs > "$OUT/input-sha256.txt"
+sha256sum Cargo.lock Cargo.toml src/coupling.rs examples/cooperation_decomposition.rs > "$OUT/input-sha256.txt"
 
 {
   echo "schema=luminous.symtropy.deterministic-reductions-overhead.v0.1"
