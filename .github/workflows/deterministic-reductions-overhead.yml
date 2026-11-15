@@ -1,0 +1,95 @@
+name: Deterministic reduction runtime and memory qualification
+
+on:
+  pull_request:
+    branches: [research/deterministic-hashmap-reductions-v0.1]
+    paths:
+      - 'scripts/benchmark-deterministic-reductions-overhead.sh'
+      - 'benchmarks/deterministic-reductions/analyze-overhead.rs'
+      - 'docs/research/DETERMINISTIC_REDUCTIONS_OVERHEAD_V0_1.md'
+      - 'docs/research/contracts/deterministic-reductions-overhead.v0.1.json'
+      - '.github/workflows/deterministic-reductions-overhead.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-overhead:
+    name: Rust 1.100.0 — 30 paired runtime and RSS trials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUST_TOOLCHAIN: '1.100.0'
+      TRIALS: '30'
+      SEED_START_INDEX: '0'
+      SEED_COUNT: '20'
+      KEEP_RESULTS: '1'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact stable toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install 1.100.0 --profile minimal
+          rustc +1.100.0 -Vv
+          cargo +1.100.0 -Vv
+
+      - name: Compile and self-test dependency-free analyzer
+        run: |
+          set -euo pipefail
+          rustc +1.100.0 -O --edition 2021 benchmarks/deterministic-reductions/analyze-overhead.rs -o "$RUNNER_TEMP/analyze-overhead"
+          "$RUNNER_TEMP/analyze-overhead" --self-test
+
+      - name: Run 30 paired runtime and peak-RSS trials
+        shell: bash
+        env:
+          RESULT_PARENT: ${{ runner.temp }}
+        run: bash scripts/benchmark-deterministic-reductions-overhead.sh
+
+      - name: Analyze paired timing and memory results
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t csvs < <(find "$RUNNER_TEMP" -maxdepth 3 -type f -name measurements.csv -print | sort)
+          [[ "${#csvs[@]}" -eq 1 ]] || { echo "Expected exactly one measurements.csv" >&2; exit 1; }
+          rustc +1.100.0 -O --edition 2021 benchmarks/deterministic-reductions/analyze-overhead.rs -o "$RUNNER_TEMP/analyze-overhead"
+          "$RUNNER_TEMP/analyze-overhead" "${csvs[0]}" | tee "$RUNNER_TEMP/overhead-report.md" | tee -a "$GITHUB_STEP_SUMMARY"
+          sed -n 's/^DETERMINISTIC_OVERHEAD_JSON=//p' "$RUNNER_TEMP/overhead-report.md" > "$RUNNER_TEMP/overhead-summary.json"
+          test "$(wc -l < "$RUNNER_TEMP/overhead-summary.json")" -eq 1
+          jq -e '.schema == "luminous.symtropy.deterministic-reductions-overhead.v0.1" and .paired_trials == 30 and .deterministic_repeatable == true' "$RUNNER_TEMP/overhead-summary.json"
+
+      - name: Validate source and lockfile immutability
+        if: always()
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- Cargo.lock
+          test -z "$(git status --porcelain -- Cargo.lock)"
+
+      - name: Upload raw overhead evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: deterministic-reduction-overhead-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/metadata.txt
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/rustc-version.txt
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/cargo-version.txt
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/source-commit.txt
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/input-sha256.txt
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/build-*.log
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/cooperation-decomposition-*
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/warmup
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/runs
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/measurements.csv
+            ${{ runner.temp }}/deterministic-reductions-overhead.*/STATUS.txt
+            ${{ runner.temp }}/overhead-report.md
+            ${{ runner.temp }}/overhead-summary.json
+          if-no-files-found: warn
+          retention-days: 30
