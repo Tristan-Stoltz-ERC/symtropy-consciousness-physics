@@ -88,18 +88,36 @@ impl EnergyBudget {
             return 0.0;
         }
 
-        // Preserve the capacity invariant if a caller has directly changed
-        // one of the historically public state fields.
-        self.available = self.available.min(self.max_energy);
-        let actual = amount.min(self.available);
-        self.available -= actual;
-        self.consumed_this_tick += actual;
-        self.lifetime_consumed += actual;
-
-        // 2nd Law: irreversible consumption increases entropy
-        if self.temperature.is_finite() && self.temperature > 0.0 && actual > 0.0 {
-            self.entropy += actual / self.temperature;
+        // Compute the entire state transition before mutating anything. This
+        // prevents arithmetic overflow or a corrupted public counter from
+        // partially applying an energy operation.
+        if !self.temperature.is_finite()
+            || self.temperature <= 0.0
+            || !self.entropy.is_finite()
+            || !self.consumed_this_tick.is_finite()
+            || !self.lifetime_consumed.is_finite()
+        {
+            return 0.0;
         }
+
+        let current_available = self.available.min(self.max_energy);
+        let actual = amount.min(current_available);
+        let next_available = current_available - actual;
+        let next_consumed = self.consumed_this_tick + actual;
+        let next_lifetime_consumed = self.lifetime_consumed + actual;
+        let next_entropy = self.entropy + actual / self.temperature;
+        if !next_available.is_finite()
+            || !next_consumed.is_finite()
+            || !next_lifetime_consumed.is_finite()
+            || !next_entropy.is_finite()
+        {
+            return 0.0;
+        }
+
+        self.available = next_available;
+        self.consumed_this_tick = next_consumed;
+        self.lifetime_consumed = next_lifetime_consumed;
+        self.entropy = next_entropy;
 
         // Check for collapse
         if self.available <= 0.0 {
@@ -123,8 +141,17 @@ impl EnergyBudget {
         {
             return;
         }
-        self.temperature += energy / self.heat_capacity;
-        self.entropy += energy / self.temperature;
+        let next_temperature = self.temperature + energy / self.heat_capacity;
+        if !next_temperature.is_finite() {
+            return;
+        }
+        let next_entropy = self.entropy + energy / next_temperature;
+        if !next_entropy.is_finite() {
+            return;
+        }
+
+        self.temperature = next_temperature;
+        self.entropy = next_entropy;
     }
 
     /// Helmholtz free energy: maximum extractable work at constant T.
@@ -147,23 +174,27 @@ impl EnergyBudget {
             return;
         }
 
-        // Normalize externally modified state before applying a valid input.
-        if !self.available.is_finite() {
-            self.available = 0.0;
-        }
-        self.available = self.available.clamp(0.0, self.max_energy);
-        if self.available == 0.0 {
-            self.collapsed = true;
+        if !self.regenerated_this_tick.is_finite() {
+            return;
         }
 
-        let actual = amount.min(self.max_energy - self.available);
-        self.available += actual;
-        self.regenerated_this_tick += actual;
-
-        // Recover from collapse only after positive energy is actually restored.
-        if self.available > 0.0 {
-            self.collapsed = false;
+        // Normalize externally modified state in a local value first. The
+        // operation is committed only after every resulting value is finite.
+        let current_available = if self.available.is_finite() {
+            self.available.clamp(0.0, self.max_energy)
+        } else {
+            0.0
+        };
+        let actual = amount.min(self.max_energy - current_available);
+        let next_available = current_available + actual;
+        let next_regenerated = self.regenerated_this_tick + actual;
+        if !next_available.is_finite() || !next_regenerated.is_finite() {
+            return;
         }
+
+        self.available = next_available;
+        self.regenerated_this_tick = next_regenerated;
+        self.collapsed = self.available == 0.0;
     }
 
     /// Whether any energy is available.
@@ -249,6 +280,18 @@ mod tests {
     }
 
     #[test]
+    fn consume_rejects_non_finite_ledger_transition_without_partial_mutation() {
+        let mut budget = EnergyBudget::new(f64::MAX);
+        budget.consumed_this_tick = f64::MAX;
+        let before_available = budget.available;
+        assert_eq!(budget.consume(f64::MAX), 0.0);
+        assert_eq!(budget.available, before_available);
+        assert_eq!(budget.consumed_this_tick, f64::MAX);
+        assert_eq!(budget.lifetime_consumed, 0.0);
+        assert_eq!(budget.entropy, 0.0);
+    }
+
+    #[test]
     fn collapse_on_zero_energy() {
         let mut budget = EnergyBudget::new(100.0);
         budget.consume(100.0);
@@ -298,6 +341,18 @@ mod tests {
     }
 
     #[test]
+    fn regenerate_rejects_non_finite_ledger_transition_without_partial_mutation() {
+        let mut budget = EnergyBudget::new(f64::MAX);
+        budget.consume(f64::MAX);
+        budget.regenerated_this_tick = f64::MAX;
+        let before_available = budget.available;
+        budget.regenerate(f64::MAX);
+        assert_eq!(budget.available, before_available);
+        assert_eq!(budget.regenerated_this_tick, f64::MAX);
+        assert!(budget.is_collapsed());
+    }
+
+    #[test]
     fn regenerate_recovers_from_collapse() {
         let mut budget = EnergyBudget::new(100.0);
         budget.consume(100.0);
@@ -341,6 +396,15 @@ mod tests {
         budget.temperature = f64::INFINITY;
         budget.dissipate_heat(10.0);
         assert_eq!(budget.temperature, f64::INFINITY);
+        assert_eq!(budget.entropy, 0.0);
+    }
+
+    #[test]
+    fn dissipate_heat_rejects_overflowing_thermal_transition() {
+        let mut budget = EnergyBudget::new(100.0);
+        budget.heat_capacity = f64::MIN_POSITIVE;
+        budget.dissipate_heat(1.0e308);
+        assert_eq!(budget.temperature, 310.0);
         assert_eq!(budget.entropy, 0.0);
     }
 
