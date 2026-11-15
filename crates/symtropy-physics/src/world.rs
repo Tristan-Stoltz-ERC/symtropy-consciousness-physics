@@ -142,9 +142,18 @@ impl<const D: usize> PhysicsWorld<D> {
         // 0. Clear events from previous step
         self.collision_events.clear();
 
-        // 1. Integrate all bodies (skip sleeping)
+        // 1. Integrate all bodies (skip sleeping). Apply the callback to
+        // externally accumulated force at the engine boundary so callers
+        // cannot accidentally bypass force modulation by using apply_force.
+        // Gravity remains a separate environmental acceleration.
         for body in &mut self.bodies {
             if !body.sleeping {
+                if body.is_dynamic() {
+                    if let Some(callback) = callback.as_deref() {
+                        body.force_accumulator =
+                            callback.modulate_force(body.handle, &body.force_accumulator);
+                    }
+                }
                 integrator::integrate(body, &self.gravity, dt);
             }
         }
@@ -381,6 +390,67 @@ impl<const D: usize> PhysicsWorld<D> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::cell::Cell;
+
+    struct ScalingCallback {
+        scale: f64,
+        calls: Cell<usize>,
+    }
+
+    impl PhysicsCallback<3> for ScalingCallback {
+        fn modulate_force(&self, _body: BodyHandle, force: &SVector<f64, 3>) -> SVector<f64, 3> {
+            self.calls.set(self.calls.get() + 1);
+            force * self.scale
+        }
+
+        fn modulate_impulse(&self, impulse: f64, _point: &SVector<f64, 3>) -> f64 {
+            impulse
+        }
+
+        fn friction_multiplier(&self, _point: &SVector<f64, 3>, _body: BodyHandle) -> f64 {
+            1.0
+        }
+
+        fn on_collision(&mut self, _event: &CollisionEvent<3>) {}
+
+        fn record_dissipation(&mut self, _energy: f64) {}
+    }
+
+    #[test]
+    fn step_with_callback_modulates_external_force_but_not_gravity() {
+        let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -10.0, 0.0]));
+        let handle = world.add_sphere(Point::origin(), 0.5, 1.0);
+        let body = world.body_mut(handle).unwrap();
+        body.linear_damping = 0.0;
+        body.apply_force(SVector::from([10.0, 0.0, 0.0]));
+
+        let mut callback = ScalingCallback {
+            scale: 0.5,
+            calls: Cell::new(0),
+        };
+        world.step_with_callback(1.0, &mut callback);
+
+        let velocity = world.body(handle).unwrap().linear_velocity;
+        assert!((velocity[0] - 5.0).abs() < 1e-10, "force should be halved: {velocity:?}");
+        assert!((velocity[1] + 10.0).abs() < 1e-10, "gravity should remain unchanged: {velocity:?}");
+        assert_eq!(callback.calls.get(), 1, "one callback per dynamic body per step");
+    }
+
+    #[test]
+    fn no_op_callback_preserves_unmodulated_force() {
+        let mut world = PhysicsWorld::<3>::new(SVector::zeros());
+        let handle = world.add_sphere(Point::origin(), 0.5, 1.0);
+        let body = world.body_mut(handle).unwrap();
+        body.linear_damping = 0.0;
+        body.apply_force(SVector::from([10.0, 0.0, 0.0]));
+
+        let mut callback = NoOpCallback;
+        world.step_with_callback(1.0, &mut callback);
+
+        let velocity = world.body(handle).unwrap().linear_velocity;
+        assert!((velocity[0] - 10.0).abs() < 1e-10);
+    }
 
     #[test]
     fn empty_world_steps() {
