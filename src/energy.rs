@@ -454,7 +454,6 @@ mod tests {
         budget.available = f64::NAN;
         assert_eq!(budget.fraction_remaining(), 0.0);
     }
-}
 
     proptest::proptest! {
         #![proptest_config(proptest::test_runner::Config::with_cases(256))]
@@ -581,4 +580,4 @@ mod tests {
             }
         }
     }
-
+}
