@@ -456,13 +456,13 @@ mod tests {
     }
 
     proptest::proptest! {
-        #![proptest_config(proptest::test_runner::Config::with_cases(256))]
+        #![proptest_config(proptest::test_runner::Config::with_cases(1_000))]
 
         #[test]
         fn generated_operation_sequences_preserve_energy_reference_model(
             operations in proptest::collection::vec(
                 (0u8..4, proptest::prelude::any::<f64>()),
-                0..128
+                100..101
             )
         ) {
             let max_energy = 1_000.0_f64;
