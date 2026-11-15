@@ -27,14 +27,15 @@ The feature is a determinism candidate, not automatically a production default. 
 The dedicated workflow:
 - runs unit tests both with and without the feature;
 - runs the adversarial registration-order regression tests with the feature;
-- builds cooperation_decomposition once with the feature enabled;
-- executes the exact same binary five times in fresh processes;
+- builds the historical default and deterministic-reductions variants separately;
+- executes each exact binary five times in fresh processes on the same seed partition;
+- treats historical-mode divergence as diagnostic evidence and requires the deterministic candidate to be byte-identical;
 - captures stdout and stderr separately;
 - requires byte-identical stdout and stderr across all five executions;
 - uploads raw outputs and checksums even when the determinism assertion fails;
 - runs both the historical default feature set and the opt-in deterministic feature set on every qualified toolchain.
 
-This establishes same-host, same-binary process repeatability for this one executable. It does not prove cross-architecture bitwise reproducibility, physical model validity, or compiler-wide determinism.
+This establishes same-host, same-binary process repeatability for this one executable and directly compares it with the historical mode. It does not prove cross-architecture bitwise reproducibility, physical model validity, or compiler-wide determinism.
 
 ## Follow-up measurement
 
