@@ -230,6 +230,7 @@ impl EnergyBudget {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn new_budget_has_full_energy() {
