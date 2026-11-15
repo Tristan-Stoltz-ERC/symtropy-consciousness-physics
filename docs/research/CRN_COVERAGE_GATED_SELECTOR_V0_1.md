@@ -146,3 +146,19 @@ A future policy objective should be constrained and multi-objective:
 where \(\mathcal A\) contains only couplings with validated marginal and semantic admissibility. A separate extension can optimize work-normalized variance after measuring actual execution cost.
 
 The SOTA target is not merely lower variance. It is lower work-normalized error **without sacrificing calibration, semantic validity, or reproducibility**.
+
+
+## Exact-head observations
+
+The qualified run used the same deterministic event-address schedule on Rust 1.99.1, 1.100.0 stable and 1.101.0-beta.1. All three produced byte-identical machine-readable receipts.
+
+| Holdout selector | Selected policy | 95% interval coverage | 95% Wilson interval | Variance ratio vs independent |
+|---|---|---:|---:|---:|
+| Variance-only | cyclic shift epsilon = 0.01 | 64.76% | [63.42%, 66.07%] | 0.0306 |
+| Coverage-gated | cyclic shift epsilon = 0.25 | 94.28% | [93.60%, 94.89%] | 0.6262 |
+
+The independent baseline's holdout coverage was 94.42%, with a Wilson interval [93.75%, 95.02%]. Its empirical variance is the denominator for both variance ratios.
+
+The variance-only policy's 3.06% variance ratio looks spectacular but its interval coverage is unacceptable for the nominal 95% procedure. The coverage-gated selector accepts a more moderate variance reduction while preserving the preregistered coverage floor on disjoint holdout studies.
+
+These results apply to this exact cyclic-shift distribution and normal interval at n=200. They do not establish that 93% is an appropriate coverage floor for real Symtropy work, nor that normal intervals should be the production estimator. Student-t, bootstrap, and skewness-aware procedures remain to be compared.
