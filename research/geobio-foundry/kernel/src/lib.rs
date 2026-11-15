@@ -433,12 +433,20 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_composition_abstains_for_unassayed_elements() {
+    fn incomplete_inventory_cannot_pass_when_known_elements_balance() {
         let mut process = water_electrolysis_fixture();
-        process.products[0].composition_complete = false;
+        process.inputs[0].composition_complete = false;
         let result = elemental_balance(&process, 1e-6, 3.0).unwrap();
         assert_eq!(result.overall_status, BalanceStatus::Unquantified);
         assert!(!result.inventory_complete);
+        assert!(result.element_balances.iter().all(|entry| entry.status == BalanceStatus::WithinTolerance));
+    }
+
+    #[test]
+    fn absent_element_in_incomplete_flow_is_unquantified() {
+        let mut process = water_electrolysis_fixture();
+        process.products[0].composition_complete = false;
+        let result = elemental_balance(&process, 1e-6, 3.0).unwrap();
         let oxygen = result.element_balances.iter().find(|entry| entry.element == "O").unwrap();
         assert_eq!(oxygen.status, BalanceStatus::Unquantified);
         let hydrogen = result.element_balances.iter().find(|entry| entry.element == "H").unwrap();
@@ -459,6 +467,22 @@ mod tests {
         let mut process = water_electrolysis_fixture();
         process.inputs[0].elements[0].mass_kg = -0.1;
         assert!(validate_process(&process).is_err());
+    }
+
+    #[test]
+    fn non_finite_element_mass_is_rejected() {
+        let mut process = water_electrolysis_fixture();
+        process.inputs[0].elements[0].mass_kg = f64::NAN;
+        assert!(validate_process(&process).is_err());
+    }
+
+    #[test]
+    fn aggregate_mass_overflow_is_rejected() {
+        let mut process = water_electrolysis_fixture();
+        process.inputs[0].elements[0].mass_kg = 1.0e308;
+        process.inputs.push(flow("second-large-feed", vec![element("H", 1.0e308)]));
+        let result = elemental_balance(&process, 1e-6, 3.0);
+        assert!(matches!(result, Err(KernelError::NumericalOverflow(_))));
     }
 
     #[test]
