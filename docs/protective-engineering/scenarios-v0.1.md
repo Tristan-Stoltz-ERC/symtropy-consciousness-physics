@@ -22,8 +22,8 @@ Start with synthetic fixtures and isolated simulators. Any OT/physical execution
 | PE-RECOVERY-001 | PE-Recovery | P0 | Stale or contaminated backup restore | Consequential authority stays disabled until artifacts, identity, config, and event history are reconciled. |
 | PE-RECOVERY-002 | PE-Recovery | P0 | Unknown transaction outcome / duplicate retry | Reconcile authoritative operation state before retrying consequential side effects. |
 | PE-EVIDENCE-001 | PE-Core | P0 | Evidence producer/verifier compromise | Tampered evidence is rejected; common-cause trust dependencies are disclosed. |
-| PE-OT-004 | PE-OT | P0 | Emergency override misuse and operator coercion | Emergency authority is bounded, attributable, reviewable, and cannot erase evidence. |
-| PE-AGENT-005 | PE-Agent | P1 | Sensitive-data leakage through logs/retrieval | Disclosure remains limited to authorized principal, purpose, and tenant. |
+| PE-HUMAN-001 | PE-OT | P0 | Emergency override misuse and operator coercion | Emergency authority is bounded, attributable, reviewable, and cannot erase evidence. |
+| PE-PRIVACY-001 | PE-Agent | P1 | Sensitive-data leakage through logs/retrieval | Disclosure remains limited to authorized principal, purpose, and tenant. |
 
 ## Per-scenario minimum record
 
