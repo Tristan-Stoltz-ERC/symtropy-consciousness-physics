@@ -461,7 +461,19 @@ mod tests {
         #[test]
         fn generated_operation_sequences_preserve_energy_reference_model(
             operations in proptest::collection::vec(
-                (0u8..4, proptest::prelude::any::<f64>()),
+                (
+                    0u8..4,
+                    proptest::prop_oneof![
+                        proptest::prelude::any::<f64>(),
+                        proptest::strategy::Just(f64::NAN),
+                        proptest::strategy::Just(f64::INFINITY),
+                        proptest::strategy::Just(f64::NEG_INFINITY),
+                        proptest::strategy::Just(-1.0_f64),
+                        proptest::strategy::Just(0.0_f64),
+                        proptest::strategy::Just(f64::MAX),
+                        proptest::strategy::Just(f64::MIN_POSITIVE),
+                    ]
+                ),
                 100..101
             )
         ) {
