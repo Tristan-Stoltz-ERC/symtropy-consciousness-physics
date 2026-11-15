@@ -168,11 +168,7 @@ fn record(
 }
 
 fn run_suite(families_exchangeable: bool) -> bool {
-    let independent_training = evaluate(
-        Coupling::Independent,
-        0,
-        REPLICATES_PER_PARTITION,
-    );
+    let independent_training = evaluate(Coupling::Independent, 0, REPLICATES_PER_PARTITION);
     let independent_holdout = evaluate(
         Coupling::Independent,
         REPLICATES_PER_PARTITION,
@@ -193,11 +189,7 @@ fn run_suite(families_exchangeable: bool) -> bool {
         let holdout = if policy == Coupling::Independent {
             independent_holdout
         } else {
-            evaluate(
-                policy,
-                REPLICATES_PER_PARTITION,
-                REPLICATES_PER_PARTITION,
-            )
+            evaluate(policy, REPLICATES_PER_PARTITION, REPLICATES_PER_PARTITION)
         };
         policy_rows.push((
             policy,
@@ -234,13 +226,8 @@ fn run_suite(families_exchangeable: bool) -> bool {
         Coupling::Independent.theoretical_variance(),
     );
 
-    let (selected, selected_training_variance) =
-        select_from_pilot(families_exchangeable);
-    let selected_holdout = evaluate(
-        selected,
-        REPLICATES_PER_PARTITION,
-        REPLICATES_PER_PARTITION,
-    );
+    let (selected, selected_training_variance) = select_from_pilot(families_exchangeable);
+    let selected_holdout = evaluate(selected, REPLICATES_PER_PARTITION, REPLICATES_PER_PARTITION);
     record(
         "pilot_selected",
         selected.label(),
@@ -330,7 +317,10 @@ mod tests {
     #[test]
     fn analytic_variances_expose_same_family_crn_harm() {
         assert_eq!(Coupling::Independent.theoretical_variance(), 1.0 / 3.0);
-        assert_eq!(Coupling::SameEventIdentity.theoretical_variance(), 2.0 / 3.0);
+        assert_eq!(
+            Coupling::SameEventIdentity.theoretical_variance(),
+            2.0 / 3.0
+        );
         assert_eq!(Coupling::Antithetic.theoretical_variance(), 0.0);
         assert_eq!(Coupling::CrossFamilySwap.theoretical_variance(), 0.0);
     }
@@ -371,11 +361,7 @@ mod tests {
             REPLICATES_PER_PARTITION,
             REPLICATES_PER_PARTITION,
         );
-        let held_out = evaluate(
-            selected,
-            REPLICATES_PER_PARTITION,
-            REPLICATES_PER_PARTITION,
-        );
+        let held_out = evaluate(selected, REPLICATES_PER_PARTITION, REPLICATES_PER_PARTITION);
         assert!(held_out.mean.abs() < 0.02);
         assert!(held_out.variance() < independent.variance() * 1.0e-8);
     }
