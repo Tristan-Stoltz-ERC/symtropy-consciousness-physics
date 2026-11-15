@@ -47,13 +47,21 @@ impl Policy {
         Self::Independent,
     ];
 
-    const fn label(self) -> &'static str {
+    fn label(self) -> &'static str {
         match self {
             Self::Independent => "independent",
-            Self::CyclicShift(0.01) => "cyclic_shift_eps_0_01",
-            Self::CyclicShift(0.025) => "cyclic_shift_eps_0_025",
-            Self::CyclicShift(0.1) => "cyclic_shift_eps_0_1",
-            Self::CyclicShift(0.25) => "cyclic_shift_eps_0_25",
+            Self::CyclicShift(epsilon) if epsilon.to_bits() == 0.01_f64.to_bits() => {
+                "cyclic_shift_eps_0_01"
+            }
+            Self::CyclicShift(epsilon) if epsilon.to_bits() == 0.025_f64.to_bits() => {
+                "cyclic_shift_eps_0_025"
+            }
+            Self::CyclicShift(epsilon) if epsilon.to_bits() == 0.1_f64.to_bits() => {
+                "cyclic_shift_eps_0_1"
+            }
+            Self::CyclicShift(epsilon) if epsilon.to_bits() == 0.25_f64.to_bits() => {
+                "cyclic_shift_eps_0_25"
+            }
             Self::CyclicShift(_) => "cyclic_shift_other",
         }
     }
@@ -119,7 +127,9 @@ struct StudyAggregate {
 impl StudyAggregate {
     fn push(&mut self, moments: Moments) {
         self.studies += 1;
-        self.covered += u64::from(moments.normal_interval_contains_zero());
+        if moments.normal_interval_contains_zero() {
+            self.covered += 1;
+        }
         self.sum_sample_variance += moments.sample_variance();
         self.sum_interval_width += moments.normal_interval_width();
         self.sum_estimate += moments.mean;
