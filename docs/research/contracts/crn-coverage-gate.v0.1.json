@@ -1,0 +1,56 @@
+{
+  "schema": "luminous.symtropy.crn-coverage-gate.v0.1",
+  "status": "synthetic_known_truth_counterexample",
+  "estimand": 0,
+  "primitives": "U,V independent Uniform(0,1)",
+  "policies": [
+    {
+      "name": "independent",
+      "contrast": "U_prime-U",
+      "theoretical_variance": "1/6"
+    },
+    {
+      "name": "cyclic_shift",
+      "contrast": "((U+epsilon*V) mod 1)-U",
+      "theoretical_variance": "epsilon/2-epsilon^2/3"
+    }
+  ],
+  "epsilons": [
+    0.01,
+    0.025,
+    0.1,
+    0.25
+  ],
+  "train_studies": 5000,
+  "holdout_studies": 5000,
+  "observations_per_study": 200,
+  "interval": {
+    "method": "normal_z_interval",
+    "nominal_coverage": 0.95,
+    "z": 1.959963984540054
+  },
+  "coverage_uncertainty": {
+    "method": "wilson_score",
+    "confidence_level": 0.95
+  },
+  "selector": {
+    "variance_only": "minimum_training_mean_sample_variance",
+    "coverage_gated": "minimum_training_mean_sample_variance_subject_to_training_wilson_95_lower_gt_0.93",
+    "coverage_floor": 0.93,
+    "holdout_read_during_selection": false
+  },
+  "required_holdout_properties": {
+    "variance_only_choice": "cyclic_shift_eps_0_01",
+    "coverage_gated_choice": "cyclic_shift_eps_0_25",
+    "gated_holdout_wilson_95_lower_gt": 0.93,
+    "gated_holdout_variance_ratio_lt": 0.8,
+    "variance_only_holdout_wilson_95_upper_lt": 0.93
+  },
+  "claims_not_established": [
+    "general_interval_calibration_for_other_estimators",
+    "real_symtropy_model_coupling_validity",
+    "universal_crn_superiority",
+    "sota_performance",
+    "wall_clock_efficiency"
+  ]
+}
