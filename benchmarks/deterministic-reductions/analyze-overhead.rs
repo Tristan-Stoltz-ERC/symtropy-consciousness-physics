@@ -92,8 +92,18 @@ fn parse(input: &str) -> Result<Vec<Row>, String> {
         if trial == 0 || !seen_trials.insert(trial) {
             return Err(format!("line {}: zero or duplicate trial", offset + 2));
         }
-        if fields[1] != "legacy" && fields[1] != "deterministic" {
-            return Err(format!("line {}: invalid first_mode", offset + 2));
+        let expected_first_mode = if trial % 2 == 1 {
+            "legacy"
+        } else {
+            "deterministic"
+        };
+        if fields[1] != expected_first_mode {
+            return Err(format!(
+                "line {}: expected alternating first_mode {}, got {}",
+                offset + 2,
+                expected_first_mode,
+                fields[1]
+            ));
         }
         let legacy_ms = parse_f64(2, "legacy_ms")?;
         let deterministic_ms = parse_f64(3, "deterministic_ms")?;
@@ -230,6 +240,25 @@ fn analyze(rows: &[Row]) -> (String, bool) {
     output.push_str("- Historical-mode digest variation is diagnostic; differing output is not normalized.\n");
     output.push_str("- The deterministic mode must have one stdout and one stderr digest for the fixed seed schedule.\n");
     output.push_str("- The 3% overhead value is a research target, not a pass/fail gate in this first measurement.\n");
+    output.push_str(&format!(
+        "DETERMINISTIC_OVERHEAD_JSON={{\"schema\":\"luminous.symtropy.deterministic-reductions-overhead.v0.1\",\"paired_trials\":{},\"median_speedup\":{:.8},\"speedup_ci95\":[{:.8},{:.8}],\"median_runtime_overhead_pct\":{:.8},\"runtime_overhead_ci95_pct\":[{:.8},{:.8}],\"median_peak_rss_ratio\":{:.8},\"peak_rss_ratio_ci95\":[{:.8},{:.8}],\"median_peak_rss_delta_kib\":{:.3},\"legacy_unique_stdout_digests\":{},\"legacy_unique_stderr_digests\":{},\"deterministic_unique_stdout_digests\":{},\"deterministic_unique_stderr_digests\":{},\"deterministic_repeatable\":{},\"research_overhead_target_pct\":3.0}}\\n",
+        rows.len(),
+        median_speedup,
+        speedup_low,
+        speedup_high,
+        median_overhead,
+        overhead_low,
+        overhead_high,
+        median(&rss_ratios),
+        rss_ratio_low,
+        rss_ratio_high,
+        median(&rss_delta),
+        legacy_stdout.len(),
+        legacy_stderr.len(),
+        deterministic_stdout.len(),
+        deterministic_stderr.len(),
+        deterministic_repeatable
+    ));
     (output, deterministic_repeatable)
 }
 
