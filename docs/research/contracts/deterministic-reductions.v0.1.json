@@ -28,7 +28,13 @@
     "normalize_output": false,
     "ci_repetitions": 5,
     "ci_seed_partition": "[0,2)",
-    "upload_raw_on_failure": true
+    "upload_raw_on_failure": true,
+    "modes": [
+      "historical_default_features",
+      "deterministic_reductions_feature"
+    ],
+    "legacy_divergence": "diagnostic_only",
+    "deterministic_mode": "must_be_byte_identical"
   },
   "qualification_toolchains": [
     "1.99.1",
