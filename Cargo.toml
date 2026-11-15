@@ -58,3 +58,8 @@ path = "examples/event_rng_crn_crossfit.rs"
 [[example]]
 name = "event_rng_crn_event_family_portfolio"
 path = "examples/event_rng_crn_event_family_portfolio.rs"
+
+# Confidence-bounded, per-event-family CRN coupling selector and holdout benchmark.
+[[example]]
+name = "event_rng_crn_uncertainty_guard"
+path = "examples/event_rng_crn_uncertainty_guard.rs"
