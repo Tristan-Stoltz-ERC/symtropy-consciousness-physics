@@ -15,6 +15,8 @@ nalgebra = "0.34"
 [features]
 default = []
 consciousness-curvature = []
+# Opt-in stable HashMap reduction order for determinism experiments.
+deterministic-reductions = []
 
 [dev-dependencies]
 proptest = "1.4"
