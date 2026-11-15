@@ -63,3 +63,8 @@ path = "examples/event_rng_crn_event_family_portfolio.rs"
 [[example]]
 name = "event_rng_joint_coupling_portfolio"
 path = "examples/event_rng_joint_coupling_portfolio.rs"
+
+# Coverage-gated selector for rare-tail cyclic-shift CRN policies.
+[[example]]
+name = "event_rng_crn_coverage_gate"
+path = "examples/event_rng_crn_coverage_gate.rs"
