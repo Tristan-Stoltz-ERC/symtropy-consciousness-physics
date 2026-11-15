@@ -305,13 +305,7 @@ jobs:
             .gated_holdout_wilson_95[0] > 0.93 and
             .gated_holdout_variance_ratio < 0.8
           ' "$RUNNER_TEMP/crn-coverage-gate-selection.json"
-          grep -q '^benchmark_status=PASS
-        env:
-          RUST_TOOLCHAIN: ${{ matrix.toolchain }}
-        run: cargo +"$RUST_TOOLCHAIN" check --locked --lib
-      - name: Preserve dependency graph
-        run: git diff --exit-code -- Cargo.lock
- "$RUNNER_TEMP/crn-coverage-gate.log"
+          grep -q '^benchmark_status=PASS$' "$RUNNER_TEMP/crn-coverage-gate.log"
           sha256sum "$RUNNER_TEMP/crn-coverage-gate.jsonl" "$RUNNER_TEMP/crn-coverage-gate-selection.json"
       - name: Compile the library surface
         env:
