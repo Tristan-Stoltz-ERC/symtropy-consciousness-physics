@@ -1,0 +1,42 @@
+{
+  "schema": "luminous.symtropy.deterministic-reductions.v0.1",
+  "feature": "deterministic-reductions",
+  "default_behavior": "historical_hashmap_reduction_preserved_when_feature_disabled",
+  "deterministic_behavior": {
+    "collective_phi": "sort_by_BodyHandle_then_Kahan_sum",
+    "callback_sanctuary_impulse": "sort_by_BodyHandle_then_multiply"
+  },
+  "adversarial_tests": {
+    "registration_orders": [
+      "ascending",
+      "descending"
+    ],
+    "hashmap_states": "independently_randomized",
+    "collective_feedback": true,
+    "callback_trait_method": "PhysicsCallback::modulate_impulse"
+  },
+  "process_probe": {
+    "executable": "cooperation_decomposition",
+    "seed_environment": [
+      "SYMTROPY_SEED_START_INDEX",
+      "SYMTROPY_SEED_COUNT"
+    ],
+    "compare": [
+      "stdout_bytes",
+      "stderr_bytes"
+    ],
+    "normalize_output": false
+  },
+  "qualification_toolchains": [
+    "1.99.1",
+    "1.100.0",
+    "1.101.0-beta.1"
+  ],
+  "claims_not_established": [
+    "exclusive_root_cause_of_pr19_nondeterminism",
+    "whole_repository_determinism",
+    "cross_architecture_bitwise_reproducibility",
+    "performance_improvement",
+    "zero_overhead"
+  ]
+}
