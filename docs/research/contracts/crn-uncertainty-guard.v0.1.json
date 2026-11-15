@@ -1,0 +1,59 @@
+{
+  "schema": "luminous.symtropy.crn-uncertainty-guard.v0.1",
+  "synthetic_only": true,
+  "train_replicates": 256,
+  "holdout_replicates": 256,
+  "subjects_per_replicate": 2048,
+  "covariance_interval": {
+    "method": "percentile_cluster_bootstrap",
+    "confidence_level": 0.99,
+    "bootstrap_draws": 10000,
+    "resampling_unit": "outer_replicate_covariance_estimate"
+  },
+  "decision": {
+    "covariance_deadband": 0.001,
+    "units": "synthetic_model_covariance",
+    "share": "lower_99pct_bound > +deadband",
+    "independent": "upper_99pct_bound < -deadband",
+    "otherwise": "abstain_and_use_independent",
+    "abstention_is_not_equivalence": true
+  },
+  "holdout": {
+    "seed_indices": "[256,512)",
+    "variance_interval": "paired_percentile_bootstrap_over_outer_replicates",
+    "bootstrap_draws": 2000
+  },
+  "comparator_policies": [
+    "all_independent",
+    "all_shared",
+    "per_family_point_estimate",
+    "per_family_uncertainty_guard",
+    "analytic_oracle"
+  ],
+  "cases": [
+    {
+      "beta_u": 0.5,
+      "beta_v": -1.5
+    },
+    {
+      "beta_u": -1.5,
+      "beta_v": 0.5
+    },
+    {
+      "beta_u": -1.05,
+      "beta_v": -1.5
+    },
+    {
+      "beta_u": -1.0666666666666667,
+      "beta_v": 0.5
+    }
+  ],
+  "claims_not_established": [
+    "real_model_event_identity_correctness",
+    "universal_crn_superiority",
+    "general_99pct_interval_calibration",
+    "rng_statistical_battery_qualification",
+    "physical_or_social_validity",
+    "sota_performance"
+  ]
+}
